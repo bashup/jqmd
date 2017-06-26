@@ -60,8 +60,6 @@ EOF
 
 # one-liner define w/argument
 DEFINE 'def jqmd_data($arg): recursive_add($arg);'
-
-echo $0; for f in "$@"; do echo "$f"; done
 ```
 
 (Whether using arguments or heredocs, keep in mind that shell quoting and jq code don't mix well: single quotes are usually best!)
