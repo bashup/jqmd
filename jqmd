@@ -8,18 +8,18 @@ RUN_JQ() {
     while (("${#opts[@]}")); do
         opt="${opts[0]}"
         case "$opt" in
-        -{f,-fromfile})             nargs=2 ; FILTER <"${opts[1]}" ;;
-        -{L,-indent})               nargs=2 ;;
-        --{arg,arjgson,slurpfile})  nargs=3 ;;
-        --)                         break   ;; # rest of args are data files
-        -*)                         nargs=1 ;;
-        *)                          FILTER "$opt"; break ;; # jq program: data files follow
+        -{f,-fromfile})                     nargs=2 ; FILTER <"${opts[1]}" ;;
+        -{L,-indent})                       nargs=2 ;;
+        --{arg,arjgson,slurpfile,argfile})  nargs=3 ;;
+        --)  break   ;; # rest of args are data files
+        -*)  nargs=1 ;;
+        *)   FILTER "$opt"; break ;; # jq program: data files follow
         esac
         cmd+=("${opts[@]:0:$nargs}")    # add $nargs args to cmd
         opts=("${opts[@]:$nargs}")      # shift $nargs args off opts
     done
 
-    HAVE_FILTERS || FILTER .
+    HAVE_FILTERS || FILTER .    # jq needs at least one filter expression
     for opt in imports defines filters; do
         [[ -f "$JQMD_TMP/$opt.jq" ]] && files+=("$JQMD_TMP/$opt.jq");
     done
