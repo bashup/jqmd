@@ -30,7 +30,7 @@ RUN_JQ() {
 
 export-dotenv() {
     local before="" after=""
-    before="$(compgen -v)"; source "$1"; after="$(compgen -v)"
+    before="$(compgen -v)"; source "$@"; after="$(compgen -v)"
     after="$(echo "$after" | grep -vxF -f <(echo "$before"))"
     [[ -z "$after" ]] || export $after;
 }
@@ -45,13 +45,13 @@ markdown-to-shell() {
     extract-markdown '\('"$lang"'\)' "$cmd"' \2 <<'"'"'```'"'" '```'
 }
 
-run-markdown() { ARGV=("$@") source <(markdown-to-shell RUN jq shell yml yaml json <"$1"); }
+run-markdown() { local ARGV=("$@"); source <(markdown-to-shell RUN jq shell yml yaml json <"$1"); }
 extract-between() { sed -ne '/'"$1"'/,/'"$2"'/ { s/\('"$1"'\)/'"${3-}"'/; s/'"$2"'/'"${4-}"'/; p}'; }
 extract-markdown() { extract-between '^```'"$1"'$' '^```$' "${@:2}"; }
 
 RUN() {
     case "$1" in
-    shell)      source <(cat) ;;
+    shell)      source <(cat) "${ARGV[@]:1}" ;;
     jq)         FILTER ;;
     yaml|yml)   YAML ;;
     json)       JSON ;;
@@ -82,11 +82,10 @@ JSON()    { FILTER < <(echo -n "jqmd_data("; cat; echo ")"); }
 
 INCLUDE() {
     [[ -f "$1" ]] || jqmd_error "INCLUDE file $1 does not exist";
-
     case "$(basename "$1")" in
     *.md|*.mdown|*.markdown)
-                    run-markdown "$1" ;;
-    *.env)          export-dotenv "$1" ;;
+                    run-markdown "$@" ;;
+    *.env)          export-dotenv "$@" ;;
     *.jq)           FILTER <"$1" ;;
     *.yaml|*.yml)   YAML <"$1" ;;
     *.json)         JSON <"$1" ;;
@@ -107,8 +106,8 @@ jqmd_teardown() {
 }
 
 jqmd_main() {
-    ARGV=("${@:2}")
-    run-markdown "$1"
+    (($# > 0)) || jqmd_error "No script specified"
+    run-markdown "$@"
     if HAVE_FILTERS; then
         RUN_JQ;
     fi

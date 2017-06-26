@@ -60,6 +60,8 @@ EOF
 
 # one-liner define w/argument
 DEFINE 'def jqmd_data($arg): recursive_add($arg);'
+
+echo $0; for f in "$@"; do echo "$f"; done
 ```
 
 (Whether using arguments or heredocs, keep in mind that shell quoting and jq code don't mix well: single quotes are usually best!)
@@ -91,16 +93,21 @@ These functions can all read input from stdin, so you can use pipelines or hered
 
 * `HAVE_FILTERS` -- succeeds if there is anything in the filter pipeline at the time of excution, fails otherwise. (i.e., you can use `if HAVE_FILTERS; then ...` to take action in a script based on the current filter state.
 
-#### Includes and Command-line Arguments
+#### Command-line Arguments and Includes
 
-The `INCLUDE` *filename* function executes another file as if it were literally included in the current file at the point of execution.  Note that the extension of *filename* **matters**, as it is used to determine how the file contents will be interpreted:
+You can pass additional arguments to `jqmd`, after the path to the markdown file.  These additional arguments are available as `$1`, `$2`, etc. within any top-level `shell` code in the markdown file.
 
-* Filenames ending in `.md`, `.mdown`, `.markd`, or `.markdown` are processed as markdown files, with code block interpretation as described at the start of this document.
-* Filenames ending in `.env` are intepreted as shell scripts, and any variables they define will be **exported**, making them available for reading via jq's `env` function (jq 1.5 and up)
-* Files ending in `.jq`, `.yaml`, `.yml`, or  `.json` are processed the same as an equivalent-language block in a markdown file, with appropriate wrapping and/or translation before being added to the curren tfilter pipeline.
-* All other filenames result in an error
+For convenient access inside of shell functions, there is also a bash array, `$ARGV`, that contains the full command line given to jqmd, including the path to the markdown file itself.  (In other words, `${ARGV[0]}` contains the path to the markdown file, `${ARGV[1]}` is the first argument after it, and so on.)
 
-`$ARGV` is a bash array containing all the arguments that appeared after the script name on the `jqmd` command line.  You can use it to obtain arguments for your script or filter.
+The `INCLUDE` *filename args...* function executes another file as if it were literally included in the current file at the point of execution.  And within the included file, the positional arguments and `$ARGV`  array reflect the arguments given to `INCLUDE`.  If you want the included file to see the same arguments, use `INCLUDE filename "$@"` (in top-level code) or `INCLUDE filename "${ARGV[@]:1}"` (inside a function).
+
+You aren't limited to including other markdown files, either.  The supplied  *filename* determines how the file's contents will be interpreted:
+
+* Filenames ending in `.md`, `.mdown`, or `.markdown` are processed as markdown files, with code block interpretation as described at the start of this document.  Additional arguments passed to `INCLUDE` are available via `$1`, `$2`, etc. and `$ARGV` as described above.
+* Filenames ending in `.env` are intepreted as shell scripts, and any variables they define will be **exported**, making them available for reading via jq's `env` function (jq 1.5 and up).  Additional arguments passed to `INCLUDE` are available via `$1`, `$2`, etc. and `$ARGV` as described above.
+* Files ending in `.jq`, `.yaml`, `.yml`, or  `.json` are processed the same as an equivalent-language block in a markdown file, with appropriate wrapping and/or translation before being added to the current filter pipeline.  Additional arguments passed to `INCLUDE` are ignored, so there is no difference between using `INCLUDE` on these file types and simply doing `FILTER <file.jq`, `YAML <file.yml`, or `JSON <file.json`.  (Indeed, `INCLUDE` is actually *less* flexible, because a valid filename is required!  The main usefulness of INCLUDE for these file types is when you don't know in advance what extension the file will have.)
+
+Any file extensions not listed above will result in an error, as `INCLUDE` cannot guess how such files should be interpreted.
 
 #### Markdown Processing Functions
 
