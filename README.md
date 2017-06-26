@@ -111,10 +111,17 @@ Any file extensions not listed above will result in an error, as `INCLUDE` canno
 
 If you're writing an extension, or a markdown processing script of your own, you may find these functions useful also:
 
-* `markdown-to-shell` *command languages...* -- read markdown from stdin, writing a sourceable shell script to stdout.  Triple-backquoted blocks tagged with any specified language are replaced with *command langname* and a heredoc for the the block body.  So for example, `markdown-to-shell process python perl` would output a `process python <<` command for each `python` code block, and and a `process perl <<` command for each `perl` code block.  It's up to you to supply a *command* that can take a language argument and process data from its stdin.  Typically, your full command using this would look something like `source <(markdown-to-shell cmd lang... <somefile.md)`, to parse `somefile.md` and execute the result
-* `extract-markdown` *language_regex [firstline lastline]* -- read markdown from stdin, extracting and writing to stdout only the triple-backquoted code blocks whose language matches *language_regex*, optionally substituting *firstline* for the opening backquote line and *lastline* for the closing line.  (If omitted, the substituions are empty, causing those lines to be replaced with blank lines.)  `markdown-to-shell` actually works by building a language regex to pass to this function, along with some creative replacement patterns for *firstline* and *lastline* to implement the command and heredoc wrappers around each code block.
+* `markdown-to-shell` *command language_regexes...* -- read markdown from stdin, writing a sourceable shell script to stdout.  Triple-backquoted blocks whose tag matches any of the specified language-regexes are replaced with *command langtag* and a heredoc for the the block body.
 
-While `markdown-to-shell` is most likely to be useful for extensions or other tools, `extract-markdown` can sometimes be useful in scripts or filters, to extract code blocks from another file, or even *from the script itself*.   (For example, generating an `.ini` configuration file from `ini` blocks embedded in a script.)
+  So for example, `markdown-to-shell process python perl` would output a `process python <<` command for each `python` code block, and and a `process perl <<` command for each `perl` code block.  It's up to you to supply a *command* that can take a language argument and process data from its stdin.  Typically, your full command using this would look something like `source <(markdown-to-shell cmd lang... <somefile.md)`, to parse `somefile.md` and execute the result
+
+* `extract-markdown` *language_regex [firstline lastline]* -- read markdown from stdin, extracting and writing to stdout only the triple-backquoted code blocks whose language matches *language_regex*, optionally substituting *firstline* for the opening backquote line and *lastline* for the closing line.  (If omitted, the substitutions are empty, causing those lines to be replaced with blank lines.)
+
+  (As it happens, `markdown-to-shell` actually works by building a single language regex to pass to this function, along with some creative replacement patterns for *firstline* and *lastline* to implement the command and heredoc wrappers around each code block.)
+
+While `markdown-to-shell` is most likely to be useful for extensions or other tools, `extract-markdown` can sometimes be useful in scripts or filters, to extract code blocks from another file, or even *from the script itself*.   (For example, a script could generate an `.ini` configuration file from `ini` blocks embedded in a script, using `extract-markdown ini <"${ARGV[0]}" >somefile.ini`.)
+
+(Note: these processing functions are based on `sed`, and so language regexes follow sed's syntax, where backslash-escapes are required to make many operators work.  Luckily, most markdown language tags are simple words and so little escaping is required.)
 
 ### How jqmd Works Internally
 
