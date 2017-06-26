@@ -66,19 +66,19 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 #### Adding jq Code and Data
 
-This first group of functions takes either a single positional argument, or reads input from stdin.  (This lets you use pipelines or heredocs (e.g. `<<EOF`) to supply their input.)
+These functions can all read input from stdin, so you can use pipelines or heredocs (e.g. `<<EOF`) to supply their input.  (Most also support passing a single explicit argument,, so you can do e.g. `FILTER '.x'` *without* needing a heredoc or pipeline.)
 
 * `IMPORTS` *arg-or-stdin* -- add the given jq `import` or `include` statements to a block that will appear at the very beginning of the jq "program".  (Each statement must be terminated with `;`, as is standard for jq.)
 * `DEFINE` *arg-or-stdin* -- add the given jq `def` statements to a block that will appear after the `IMPORTS`, but before any filters.  (Each statement must be terminated with `;`, as is standard for jq.)
 * `FILTER` *arg-or-stdin* -- add the given jq expression to the jq filter pipeline.  The expression is automatically prefixed with `|` if any filter expressions have already been added to the pipeline.  (This function is the programmatic equivalent of including a `jq` code block at the current point of execution.)
-* `JSON` *arg-or-stdin* -- wraps the given data in a call to `jqmd_data()`, and adds it to the filter pipeline.   (This function is the programmatic equivalent of including a `json` code block at the current point of execution.)
-* `YAML` *arg-or-stdin* -- converts the YAML to JSON, then wraps the data in a call to `jqmd_data()`, and adds it to the filter pipeline.   (This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if the system default `python` has PyYAML installed.)
+* `JSON`  -- reads JSON data from stdin, wraps it in a call to `jqmd_data()`, and adds it to the filter pipeline.   (This function is the programmatic equivalent of including a `json` code block at the current point of execution.)
+* `YAML` -- reads YAML data from stdin, converts it to JSON, then passes it to `JSON`.  (This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if the system default `python` has PyYAML installed.)
 
 #### Adding jq Options and Arguments
 
 * `JQOPTS` *opts...* -- add *opts* to the jq command line being built up.  Whenever jq is run (either explicitly using `RUN_JQ`, or implicitly at the end of the document), the given options will be part of the command line.
-* `ARG` *name value-or-stdin* -- define a jq variable named `$`*name*, with the supplied string value.  (Basically equivalent to `JQOPTS --arg` *name* *value*, except with support for input from stdin.)
-* `ARGJSON` *name json-or-stdin* -- define a jq variable named `$`*name*, with the supplied JSON value.  (Basically equivalent to `JQOPTS --argjson` *name* *json*, except with support for input from stdin.)
+* `ARG` *name value-or-stdin* -- define a jq variable named `$`*name*, with the supplied string value.  (Basically equivalent to `JQOPTS --arg name value`, except that the value can come from stdin.)
+* `ARGJSON` *name json-or-stdin* -- define a jq variable named `$`*name*, with the supplied JSON value.  (Basically equivalent to `JQOPTS --argjson name json`, except that the data can come from stdin.)  This is especially useful for passing the output of other programs or data files as arguments to your jq code, e.g. `wp option get something --format=json | ARGJSON something`.
 
 
 #### Controlling jq Execution
