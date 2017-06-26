@@ -2,6 +2,8 @@
 
 `jqmd` is a tool for writing well-documented, complex manipulations of YAML or JSON data structures using bash scripting and `jq`.  It allows you to mix both kinds of code -- plus snippets of YAML or JSON data! -- within one or more markdown documents, making it easier to write scripts to do complex things like generate `docker-compose` configurations or manipulate serialized Wordpress options.  (It can even read `.env` files and make the variables accessible from jq expressions!) 
 
+Although `jqmd` is designed to help with jq programming, it can also be used to write literate bash scripts.  If your scripts don't use any of the jq-specific features, `jqmd` won't invoke `jq`.  (So you can actually use `jqmd` without jq even being installed on your system in that case.)
+
 ### Usage
 
 Running `jqmd some-document.md args...` will read and interpret triple-quoted code blocks from `some-document.md`, according to the language listed on the block:
@@ -14,7 +16,7 @@ Once all blocks have been executed or added to the filter pipeline, jq is run on
 
 ### Installation and Setup
 
-If you have [basher](https://github.com/basherpm/basher), you can install via `basher install pjeby/jqmd`.  Otherwise just clone this repo or copy the file and place it on your `PATH`.
+If you have [basher](https://github.com/basherpm/basher), you can install via `basher install pjeby/jqmd`.  Otherwise just clone this repo or copy the file and place it on your `PATH`.  For most uses, you will also need a recent version of `jq` installed, though it's possible to write scripts that don't use jq at all.
 
 Invoke `jqmd` *mdfile args...* to run a jqmd script or filter.  You can optionally make a markdown file executable by giving it a shebang line such as `#!/usr/bin/env jqmd`, or if you prefer not to make it a level one heading, you can put something like this on the first line instead:
 
@@ -26,10 +28,14 @@ Most markdown processors will treat the above as a standalone paragraph containi
 
 ### Programming Models
 
-`jqmd` supports developing three types of program: filters, scripts, and extensions.
+`jqmd` supports developing three types of programs: filters, scripts, and extensions.  The main differences are that:
+
+* Filters typically run jq once, implicitly, at the end of the document, sending the output to stdout,
+* Scripts explicitly run jq multiple times or not at all, and
+* Extensions are shell scripts written using `jqmd` functions to create different markdown processing and/or jq support tools.
 
 #### Filters
-Filters are programs that build up a single giant jq pipeline, and then act as a filter, taking JSON input from stdin and sending the result to stdout.  If your markdown document defines at least one filter, and doesn't use `RUN_JQ` or `CLEAR_FILTERS`, it's a filter.  `jqmd` will automatically run `jq` to do the filtering from stdin to stdout, after the *entire markdown document* (and anything it `INCLUDE`s) have been processed.
+Filters are programs that build up a single giant jq pipeline, and then act as a filter, typically taking JSON input from stdin and sending the result to stdout.  If your markdown document defines at least one filter, and doesn't use `RUN_JQ` or `CLEAR_FILTERS` to reset the pipeline, it's a filter.  `jqmd` will automatically run `jq` to do the filtering from stdin to stdout, after the *entire markdown document* (and anything it `INCLUDE`s) have been processed.  If you don't want jq to read from stdin, you can use `JQOPTS -n` within your script to start the filter pipeline without any file input.  (Similarly, you can use `JQOPTS -- somefile` to force jq to read input from a specific file instead of stdin.)
 
 #### **Scripts**
 
@@ -66,13 +72,44 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 #### Adding jq Code and Data
 
-These functions can all read input from stdin, so you can use pipelines or heredocs (e.g. `<<EOF`) to supply their input.  (Most also support passing a single explicit argument,, so you can do e.g. `FILTER '.x'` *without* needing a heredoc or pipeline.)
+These functions can all read input from their stdin, so you can use pipelines, redirection, or heredocs (e.g. `<<'EOF'`) to supply their input.  (Most also support passing a single explicit argument, so you can do e.g. `FILTER '.x'` *without* needing a heredoc or pipeline.)
 
 * `IMPORTS` *arg-or-stdin* -- add the given jq `import` or `include` statements to a block that will appear at the very beginning of the jq "program".  (Each statement must be terminated with `;`, as is standard for jq.)
-* `DEFINE` *arg-or-stdin* -- add the given jq `def` statements to a block that will appear after the `IMPORTS`, but before any filters.  (Each statement must be terminated with `;`, as is standard for jq.)
+
+* `DEFINE` *arg-or-stdin* -- add the given jq `def` statements to a block that will appear after the `IMPORTS`, but *before* any filters.  (Each statement must be terminated with `;`, as is standard for jq.)
+
+  Note: you do **not** have to define all your functions this way.  Functions can also be defined at the beginning of `FILTER` blocks or `jq`-tagged code blocks.  The main benefits of using `DEFINE` blocks are that:
+
+  - They can be done "out of order" within a document: you can use a function in a `jq` or `FILTER` block *before* its `DEFINE` block appears, as long as the `DEFINE` happens before jq is actually run.
+
+  - In a script that runs jq more than once, `IMPORTS` and `DEFINE` blocks persist across jq runs, while `jq` and `FILTER` blocks reset after every `RUN_JQ`.
+
+  - While a `jq` or `FILTER` block *has* to include a filter expression of some kind (even if it's just `.`), `DEFINE` blocks can **only** contain definitions and comments.
+
+    (Well, technically, you *can* include filtering expressions in a `DEFINE` block, but it's not recommended, and you would then have to end the block with a `|` to get a syntactically-correct jq program.)
+
 * `FILTER` *arg-or-stdin* -- add the given jq expression to the jq filter pipeline.  The expression is automatically prefixed with `|` if any filter expressions have already been added to the pipeline.  (This function is the programmatic equivalent of including a `jq` code block at the current point of execution.)
+
+  Every `jq`-tagged code block or `FILTER` argument **must** contain a jq expression.  Since jq expressions can begin with function definitions, this means that you can begin a filter with function definitions.  This can be useful for redefining `jqmd_data` or other functions at various points within your pipeline, or to define functions that will only be used for one `RUN_JQ` pipeline.
+
+  Bear in mind, however, that because a filter block *must* contain a valid jq expression, you may need to terminate your filter with a `.` if it contains only functions.  For example, this bit of `jq` code is a valid filter, because it ends with a `.`:
+
+  ```jq
+  # Add as many functions as you like
+  def f1($other): something;
+  def f2: another(thing);
+
+  # but finish with a '.' to create a no-op filtering expression
+  .
+  ```
+
+  This "end function-only filters with a ." rule applies whether you're using `jq`-tagged code blocks or the `FILTER` function.
+
 * `JSON`  -- reads JSON data from stdin, wraps it in a call to `jqmd_data()`, and adds it to the filter pipeline.   (This function is the programmatic equivalent of including a `json` code block at the current point of execution.)
+
 * `YAML` -- reads YAML data from stdin, converts it to JSON, then passes it to `JSON`.  (This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if the system default `python` has PyYAML installed.)
+
+Notice that data is always filtered through a `jqmd_data()` function, which your script must define.  You are not required to keep this function the same, however.  You can redefine it at various points in your pipeline if you need to handle it.  (Just remember that within each filter block, you can begin with function definitions but *must* end with an expression, even if it's only a `.`.)
 
 #### Adding jq Options and Arguments
 
