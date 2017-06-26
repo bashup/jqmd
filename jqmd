@@ -4,27 +4,27 @@ set -euo pipefail
 jqmd_error() { echo "$@" >&2; exit 1; }
 
 RUN_JQ() {
-    local opt nargs opts=(jq) files=() opts_in=("${JQ_OPTS[@]:1}" "$@")
-
-    while (("${#opts_in[@]}")); do
-        opt="${opts_in[0]}"
+    local opt nargs cmd=(jq) files=() opts=("${JQOPTS[@]:1}" "$@")
+    while (("${#opts[@]}")); do
+        opt="${opts[0]}"
         case "$opt" in
-        -{f,-fromfile})             nargs=2 ; FILTER <"${opts_in[1]}" ;;
+        -{f,-fromfile})             nargs=2 ; FILTER <"${opts[1]}" ;;
         -{L,-indent})               nargs=2 ;;
         --{arg,arjgson,slurpfile})  nargs=3 ;;
         --)                         break   ;; # rest of args are data files
         -*)                         nargs=1 ;;
-        *)                          FILTER "$opt"; break ;;
+        *)                          FILTER "$opt"; break ;; # jq program: data files follow
         esac
-        opts+=("${opts_in[@]:0:$nargs}");
-        opts_in=("${opts_in[@]:$nargs}")
+        cmd+=("${opts[@]:0:$nargs}")    # add $nargs args to cmd
+        opts=("${opts[@]:$nargs}")      # shift $nargs args off opts
     done
 
     HAVE_FILTERS || FILTER .
     for opt in imports defines filters; do
         [[ -f "$JQMD_TMP/$opt.jq" ]] && files+=("$JQMD_TMP/$opt.jq");
     done
-    opts_in[0]=n/a; "${opts[@]}" -f <(cat "${files[@]}") "${opts_in[@]:1}"
+
+    opts[0]=n/a; "${cmd[@]}" -f <(cat "${files[@]}") "${opts[@]:1}"
     CLEAR_FILTERS   # cleanup for any re-runs
 }
 
@@ -66,13 +66,13 @@ catarg() {
     if (($# > 2)); then echo  -n "$3" >>"$1"; else cat >>"$1"; fi
 }
 
-JQ_OPTS=(jq)
+JQOPTS=(jq)
 HAVE_FILTERS() { [[ -f "$JQMD_TMP/filters.jq" ]] ; }
 CLEAR_FILTERS() { if HAVE_FILTERS; then rm "$JQMD_TMP/filters.jq"; fi ; }
 
-JQOPTS()  { JQ_OPTS+=("$@"); }
-ARG()     { JQOPTS --arg     "$1" "${2-$(cat)}"; }
-ARGJSON() { JQOPTS --argjson "$1" "${2-$(cat)}"; }
+JQ_OPTS() { JQOPTS+=("$@"); }
+ARG()     { JQ_OPTS --arg     "$1" "${2-$(cat)}"; }
+ARGJSON() { JQ_OPTS --argjson "$1" "${2-$(cat)}"; }
 
 IMPORTS() { catarg "$JQMD_TMP/imports.jq" $'\n' "$@"; }
 DEFINE()  { catarg "$JQMD_TMP/defines.jq" $'\n' "$@"; }

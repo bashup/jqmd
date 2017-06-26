@@ -35,7 +35,7 @@ Most markdown processors will treat the above as a standalone paragraph containi
 * Extensions are shell scripts written using `jqmd` functions to create different markdown processing and/or jq support tools.
 
 #### Filters
-Filters are programs that build up a single giant jq pipeline, and then act as a filter, typically taking JSON input from stdin and sending the result to stdout.  If your markdown document defines at least one filter, and doesn't use `RUN_JQ` or `CLEAR_FILTERS` to reset the pipeline, it's a filter.  `jqmd` will automatically run `jq` to do the filtering from stdin to stdout, after the *entire markdown document* (and anything it `INCLUDE`s) have been processed.  If you don't want jq to read from stdin, you can use `JQOPTS -n` within your script to start the filter pipeline without any file input.  (Similarly, you can use `JQOPTS -- somefile` to force jq to read input from a specific file instead of stdin.)
+Filters are programs that build up a single giant jq pipeline, and then act as a filter, typically taking JSON input from stdin and sending the result to stdout.  If your markdown document defines at least one filter, and doesn't use `RUN_JQ` or `CLEAR_FILTERS` to reset the pipeline, it's a filter.  `jqmd` will automatically run `jq` to do the filtering from stdin to stdout, after the *entire markdown document* (and anything it `INCLUDE`s) have been processed.  If you don't want jq to read from stdin, you can use `JQ_OPTS -n` within your script to start the filter pipeline without any file input.  (Similarly, you can use `JQ_OPTS -- somefile` to force jq to read input from a specific file instead of stdin.)
 
 #### **Scripts**
 
@@ -113,14 +113,14 @@ Notice that data is always filtered through a `jqmd_data()` function, which your
 
 #### Adding jq Options and Arguments
 
-* `JQOPTS` *opts...* -- add *opts* to the jq command line being built up.  Whenever jq is run (either explicitly using `RUN_JQ`, or implicitly at the end of the document), the given options will be part of the command line.
-* `ARG` *name value-or-stdin* -- define a jq variable named `$`*name*, with the supplied string value.  (Basically equivalent to `JQOPTS --arg name value`, except that the value can come from stdin.)
-* `ARGJSON` *name json-or-stdin* -- define a jq variable named `$`*name*, with the supplied JSON value.  (Basically equivalent to `JQOPTS --argjson name json`, except that the data can come from stdin.)  This is especially useful for passing the output of other programs or data files as arguments to your jq code, e.g. `wp option get something --format=json | ARGJSON something`.
+* `JQ_OPTS` *opts...* -- add *opts* to the jq command line being built up.  Whenever jq is run (either explicitly using `RUN_JQ`, or implicitly at the end of the document), the given options will be part of the command line.
+* `ARG` *name value-or-stdin* -- define a jq variable named `$`*name*, with the supplied string value.  (Basically equivalent to `JQ_OPTS --arg name value`, except that the value can come from stdin.)
+* `ARGJSON` *name json-or-stdin* -- define a jq variable named `$`*name*, with the supplied JSON value.  (Basically equivalent to `JQ_OPTS --argjson name json`, except that the data can come from stdin.)  This is especially useful for passing the output of other programs or data files as arguments to your jq code, e.g. `wp option get something --format=json | ARGJSON something`.
 
 
 #### Controlling jq Execution
 
-* `RUN_JQ` *args...* -- invoke `jq` with the current `JQOPTS` and given *args*.  If a "program" is given in `JQOPTS` (i.e., a non-option argument other than `--`), it's added to the filter pipeline, after any `IMPORTS` and `DEFINE` blocks established so far.  Any `-f` or `--fromfile` options are similarly added to the filter pipeline, and multiple such files are allowed.  (Unlike plain jq, which doesn't work properly with multiple `-f` options.)
+* `RUN_JQ` *args...* -- invoke `jq` with the current `JQ_OPTS` and given *args*.  If a "program" is given in `JQ_OPTS` (i.e., a non-option argument other than `--`), it's added to the filter pipeline, after any `IMPORTS` and `DEFINE` blocks established so far.  Any `-f` or `--fromfile` options are similarly added to the filter pipeline, and multiple such files are allowed.  (Unlike plain jq, which doesn't work properly with multiple `-f` options.)
 
   After jq is run, the filter pipeline is emptied with `CLEAR_FILTERS`
 
