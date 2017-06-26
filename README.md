@@ -102,6 +102,15 @@ The `INCLUDE` *filename* function executes another file as if it were literally 
 
 `$ARGV` is a bash array containing all the arguments that appeared after the script name on the `jqmd` command line.  You can use it to obtain arguments for your script or filter.
 
+#### Markdown Processing Functions
+
+If you're writing an extension, or a markdown processing script of your own, you may find these functions useful also:
+
+* `markdown-to-shell` *command languages...* -- read markdown from stdin, writing a sourceable shell script to stdout.  Triple-backquoted blocks tagged with any specified language are replaced with *command langname* and a heredoc for the the block body.  So for example, `markdown-to-shell process python perl` would output a `process python <<` command for each `python` code block, and and a `process perl <<` command for each `perl` code block.  It's up to you to supply a *command* that can take a language argument and process data from its stdin.  Typically, your full command using this would look something like `source <(markdown-to-shell cmd lang... <somefile.md)`, to parse `somefile.md` and execute the result
+* `extract-markdown` *language_regex [firstline lastline]* -- read markdown from stdin, extracting and writing to stdout only the triple-backquoted code blocks whose language matches *language_regex*, optionally substituting *firstline* for the opening backquote line and *lastline* for the closing line.  (If omitted, the substituions are empty, causing those lines to be replaced with blank lines.)  `markdown-to-shell` actually works by building a language regex to pass to this function, along with some creative replacement patterns for *firstline* and *lastline* to implement the command and heredoc wrappers around each code block.
+
+While `markdown-to-shell` is most likely to be useful for extensions or other tools, `extract-markdown` can sometimes be useful in scripts or filters, to extract code blocks from another file, or even *from the script itself*.   (For example, generating an `.ini` configuration file from `ini` blocks embedded in a script.)
+
 ### How jqmd Works Internally
 
 Because of the limits on how `jq` syntax works, `jqmd` has to accumulate imports, definitions, and filters separately.  Because the maximum amount of data that can be stored in a variable or passed on a command-line varies between platforms (and is sometimes quite small), these accumulations are done in temporary files.  A temporary directory is created at the beginning of `jqmd` execution, and wiped by an `EXIT` trap.
