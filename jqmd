@@ -31,8 +31,8 @@ RUN_JQ() {
 export-dotenv() {
     local before="" after=""
     before="$(compgen -v)"; source "$@"; after="$(compgen -v)"
-    after="$(echo "$after" | grep -vxF -f <(echo "$before"))"
-    [[ -z "$after" ]] || export $after;
+    after="$(echo "$after" | grep -vxF -f <(echo "$before"))" || true
+    [[ -z "$after" ]] || export $after
 }
 
 yaml2json() {
