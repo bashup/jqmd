@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-jqmd_error() { echo "$@" >&2; exit 1; }
+source "$(command -v mdsh)"
 
 RUN_JQ() {
     local opt nargs cmd=(jq) files=() opts=("${JQOPTS[@]:1}" "$@")
@@ -21,7 +21,7 @@ RUN_JQ() {
 
     HAVE_FILTERS || FILTER .    # jq needs at least one filter expression
     for opt in imports defines filters; do
-        [[ -f "$JQMD_TMP/$opt.jq" ]] && files+=("$JQMD_TMP/$opt.jq");
+        [[ -f "$MDSH_TMP/$opt.jq" ]] && files+=("$MDSH_TMP/$opt.jq");
     done
 
     opts[0]=n/a; "${cmd[@]}" -f <(cat "${files[@]}") "${opts[@]:1}"
@@ -39,85 +39,44 @@ yaml2json() {
     python -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout, indent=4)';
 }
 
-markdown-to-shell() {
-    local arg cmd="$1" lang="$2"
-    for arg in "${@:3}"; do lang="$lang"'\|'"$arg"; done
-    extract-markdown '\('"$lang"'\)' "$cmd"' \2 <<'"'"'```'"'" '```'
-}
-
-run-markdown() { local ARGV=("$@"); source <(markdown-to-shell RUN jq shell yml yaml json <"$1"); }
-extract-between() { sed -ne '/'"$1"'/,/'"$2"'/ { s/\('"$1"'\)/'"${3-}"'/; s/'"$2"'/'"${4-}"'/; p}'; }
-extract-markdown() { extract-between '^```'"$1"'$' '^```$' "${@:2}"; }
-
-RUN() {
-    case "$1" in
-    shell)      source <(cat) "${ARGV[@]:1}" ;;
-    jq)         FILTER ;;
-    yaml|yml)   YAML ;;
-    json)       JSON ;;
-    esac
-}
-
 catarg() {
     if (($# > 3)); then
-        jqmd_error "Too many arguments: ""${@:3}";
+        mdsh-error "Too many arguments: ""${@:3}";
     fi
     if [[ -f "$1" ]]; then echo -n "$2" >>"$1"; fi
     if (($# > 2)); then echo  -n "$3" >>"$1"; else cat >>"$1"; fi
 }
 
-JQOPTS=(jq)
-HAVE_FILTERS() { [[ -f "$JQMD_TMP/filters.jq" ]] ; }
-CLEAR_FILTERS() { if HAVE_FILTERS; then rm "$JQMD_TMP/filters.jq"; fi ; }
+HAVE_FILTERS() { [[ -n "$MDSH_TMP" ]] && [[ -f "$MDSH_TMP/filters.jq" ]] ; }
+CLEAR_FILTERS() { if HAVE_FILTERS; then rm "$MDSH_TMP/filters.jq"; fi ; }
 
+JQOPTS=(jq)
 JQ_OPTS() { JQOPTS+=("$@"); }
+
 ARG()     { JQ_OPTS --arg     "$1" "${2-$(cat)}"; }
 ARGJSON() { JQ_OPTS --argjson "$1" "${2-$(cat)}"; }
 
-IMPORTS() { catarg "$JQMD_TMP/imports.jq" $'\n' "$@"; }
-DEFINE()  { catarg "$JQMD_TMP/defines.jq" $'\n' "$@"; }
-FILTER()  { catarg "$JQMD_TMP/filters.jq" '|'   "$@"; }
+IMPORTS() { mdsh-create-tempdir; catarg "$MDSH_TMP/imports.jq" $'\n' "$@"; }
+DEFINE()  { mdsh-create-tempdir; catarg "$MDSH_TMP/defines.jq" $'\n' "$@"; }
+FILTER()  { mdsh-create-tempdir; catarg "$MDSH_TMP/filters.jq" '|'   "$@"; }
+
 YAML()    { yaml2json | JSON; }
 JSON()    { FILTER < <(echo -n "jqmd_data("; cat; echo ")"); }
 
-INCLUDE() {
-    [[ -f "$1" ]] || jqmd_error "INCLUDE file $1 does not exist";
-    case "$(basename "$1")" in
-    *.md|*.mdown|*.markdown)
-                    run-markdown "$@" ;;
-    *.env)          export-dotenv "$@" ;;
-    *.jq)           FILTER <"$1" ;;
-    *.yaml|*.yml)   YAML <"$1" ;;
-    *.json)         JSON <"$1" ;;
-    *)              jqmd_error "Unrecognized type for INCLUDEd file $1" ;;
-    esac
-}
+mdsh-lang-jq()   { FILTER ; }
+mdsh-lang-yml()  { YAML ; }
+mdsh-lang-yaml() { YAML ; }
+mdsh-lang-json() { JSON ; }
 
-jqmd_setup() {
-    if [[ -z "${JQMD_TMP-}" ]]; then
-        JQMD_TMP="$(mktemp -t -d jqmd-XXXXXXXXXX)"
-        trap jqmd_teardown EXIT
-    fi
-}
-
-jqmd_teardown() {
-    [[ -n "${JQMD_TMP-}" ]] && [[ -d "$JQMD_TMP" ]] && rm -rf "$JQMD_TMP" || true;
-    unset JQMD_TMP
-}
-
-jqmd_main() {
-    (($# > 0)) || jqmd_error "No script specified"
-    run-markdown "$@"
-    if HAVE_FILTERS; then
-        RUN_JQ;
-    fi
-}
-
-jqmd_setup # nothing works correctly without this!
+mdsh-include-jq()   { FILTER <"$1" ; }
+mdsh-include-env()  { export-dotenv "$@" ; }
+mdsh-include-yml()  { YAML <"$1" ; }
+mdsh-include-yaml() { YAML <"$1" ; }
+mdsh-include-json() { JSON <"$1" ; }
 
 # check bash-source and run main only if directly executing
 if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
-    jqmd_main "$@"
+    mdsh-main "$@"
     exit $?
 fi
 
