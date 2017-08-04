@@ -183,7 +183,17 @@ Another trick you can do with postprocessing hooks, is to automatically run jq a
 > ​```
 > ~~~
 
-The above script will run `jq` twice on `somefile.json` with two different filters, instead of once with the results of the first filter being passed through the second.  (Because each run of `RUN_JQ` resets the filter pipeline.)  As always, however,`IMPORTS` and `DEFINES` are retained from one run to the next.
+The above script will run `jq` twice on `somefile.json` with two different filters, instead of once with the results of the first filter being passed through the second.  (Because each run of `RUN_JQ` resets the filter pipeline.)  As always, however,`IMPORTS`, `DEFINES`, `JQ_OPTS`, `ARG` defs, etc. are retained from one jq run to the next.
 
-Note that `mdsh` post-processing hooks are **only** applied to blocks found in the current markdown file or any `INCLUDE`d markdown files.  They do **not** run when `FILTER` ,  `YAML` , `JSON`, etc. are invoked programmatically, or upon`INCLUDE` of non-markdown files!
+(Note that `mdsh` post-processing hooks are **only** applied to blocks found in the current markdown file or any `INCLUDE`d markdown files.  They do **not** run when `FILTER` ,  `YAML` , `JSON`, etc. are invoked programmatically, or upon`INCLUDE` of non-markdown files!)
+
+## LICENSE
+
+`jqmd` is copyright 2017 PJ Eby, and MIT-licensed as follows:
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT OWNERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
