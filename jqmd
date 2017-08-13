@@ -93,7 +93,6 @@ CLEAR_FILTERS() { if HAVE_FILTERS; then rm "$MDSH_TMP/filters.jq"; fi ; }
 
 JQOPTS=(jq)
 JQ_OPTS() { JQOPTS+=("$@"); }
-
 ARG()     { JQ_OPTS --arg     "$1" "${2-$(cat)}"; }
 ARGJSON() { JQ_OPTS --argjson "$1" "${2-$(cat)}"; }
 
@@ -118,6 +117,7 @@ mdsh-include-json() { JSON <"$1" ; }
 # check bash-source and run main only if directly executing
 if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
     mdsh-main "$@"
+    if HAVE_FILTERS; then RUN_JQ; fi
     exit $?
 fi
 
