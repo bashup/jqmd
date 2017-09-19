@@ -92,6 +92,7 @@ HAVE_FILTERS() { [[ -n "$MDSH_TMP" ]] && [[ -f "$MDSH_TMP/filters.jq" ]] ; }
 CLEAR_FILTERS() { if HAVE_FILTERS; then rm "$MDSH_TMP/filters.jq"; fi ; }
 
 JQOPTS=(jq)
+
 JQ_OPTS() { JQOPTS+=("$@"); }
 ARG()     { JQ_OPTS --arg     "$1" "${2-$(cat)}"; }
 ARGJSON() { JQ_OPTS --argjson "$1" "${2-$(cat)}"; }
@@ -108,16 +109,15 @@ mdsh-lang-yml()  { YAML ; }
 mdsh-lang-yaml() { YAML ; }
 mdsh-lang-json() { JSON ; }
 
-mdsh-include-jq()   { FILTER <"$1" ; }
-mdsh-include-env()  { export-dotenv "$@" ; }
-mdsh-include-yml()  { YAML <"$1" ; }
-mdsh-include-yaml() { YAML <"$1" ; }
-mdsh-include-json() { JSON <"$1" ; }
-
 # check bash-source and run main only if directly executing
 if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
     mdsh-main "$@"
     if HAVE_FILTERS; then RUN_JQ; fi
     exit $?
 fi
+
+
+
+
+
 

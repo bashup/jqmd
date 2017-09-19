@@ -2,7 +2,7 @@
 
 `jqmd` is a tool for writing well-documented, complex manipulations of YAML or JSON data structures using bash scripting and `jq`.  It allows you to mix both kinds of code -- plus snippets of YAML or JSON data! -- within one or more markdown documents, making it easier to write scripts that do complex things like generate `docker-compose` configurations or manipulate serialized Wordpress options.  (It can even read `.env` files and make the variables accessible from jq expressions!)
 
-`jqmd` is implemented as an [`mdsh`](https://github.com/bashup/mdsh) extension, which means you can extend it to process additional kinds of code blocks by defining functions inside your `shell` blocks.  (It also means you need `mdsh` on your path!)
+`jqmd` is implemented as an [`mdsh`](https://github.com/bashup/mdsh) extension, which means you can extend it to process additional kinds of code blocks by defining functions inside your `mdsh` blocks.  (It also means you need `mdsh` on your path!)
 
 If you have [`basher`](https://github.com/basherpm/basher) on your system, it's the easiest way to install `jqmd`, as it will automatically install `mdsh` as part of the installation.  Just run:
 
@@ -16,11 +16,11 @@ If you don't have or want `basher`, though, you'll need to manually install `mds
 
 Running `jqmd some-document.md args...` will read and interpret triple-quoted code blocks from `some-document.md`, according to the language listed on the block:
 
-* `shell` -- interpreted as bash code, executed immediately.  Shell blocks can invoke various jqmd functions as described later in this document.  They can also `INCLUDE` other files, such as other markdown files, `.env` files, `.jq` files, `.yml` or `.json` files -- see the docs for the `INCLUDE` function near the end of this document.)
+* `shell` -- interpreted as bash code, executed immediately.  Shell blocks can invoke various jqmd functions as described later in this document.
 * `jq` -- jq code, which is added to a jq filter pipeline for execution at the end of the file, or to be run explicitly with the `RUN_JQ` function.
 * `yaml`, `json` -- constant data, which is added to the jq filter pipeline as `jqmd_data(data)`; the effect of this depends on your definition of a `jqmd_data`  function as of the current point in the filter pipeline.  (Note: yaml data can only be processed if the system `python` interpreter has PyYAML installed; otherwise an error will occur.)
 
-(As with `mdsh`, you can extend the above list by defining appropriate hook functions; see the section below on "Supporting Additional Languages" for more info.)
+(As with `mdsh`, you can extend the above list by defining appropriate hook functions in `mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
 
 Once all blocks have been executed or added to the filter pipeline, jq is run on standard input with the built-up filter pipeline, if any.  (If the filtering pipeline is empty, jq is not run.)  Filter pipeline elements are automatically separated with `|`,  so you should not include a `|` at the beginning or end of your `jq` blocks or `FILTER` code.
 
@@ -41,7 +41,7 @@ Most markdown processors will treat the above as a standalone paragraph containi
 * Extensions are shell scripts written using `jqmd` functions to create different markdown processing and/or jq support tools.
 
 #### Filters
-Filters are programs that build up a single giant jq pipeline, and then act as a filter, typically taking JSON input from stdin and sending the result to stdout.  If your markdown document defines at least one filter, and doesn't use `RUN_JQ` or `CLEAR_FILTERS` to reset the pipeline, it's a filter.  `jqmd` will automatically run `jq` to do the filtering from stdin to stdout, after the *entire markdown document* (and anything it `INCLUDE`s) have been processed.  If you don't want jq to read from stdin, you can use `JQ_OPTS -n` within your script to start the filter pipeline without any file input.  (Similarly, you can use `JQ_OPTS -- somefile` to force jq to read input from a specific file instead of stdin.)
+Filters are programs that build up a single giant jq pipeline, and then act as a filter, typically taking JSON input from stdin and sending the result to stdout.  If your markdown document defines at least one filter, and doesn't use `RUN_JQ` or `CLEAR_FILTERS` to reset the pipeline, it's a filter.  `jqmd` will automatically run `jq` to do the filtering from stdin to stdout, after the *entire markdown document* has been processed.  If you don't want jq to read from stdin, you can use `JQ_OPTS -n` within your script to start the filter pipeline without any file input.  (Similarly, you can use `JQ_OPTS -- somefile` to force jq to read input from a specific file instead of stdin.)
 
 #### **Scripts**
 
@@ -136,29 +136,15 @@ Notice that data is always filtered through a `jqmd_data()` function, which your
 
 * `HAVE_FILTERS` -- succeeds if there is anything in the filter pipeline at the time of excution, fails otherwise. (i.e., you can use `if HAVE_FILTERS; then ...` to take action in a script based on the current filter state.
 
-#### Command-line Arguments and Includes
+#### Command-line Arguments
 
 You can pass additional arguments to `jqmd`, after the path to the markdown file.  These additional arguments are available as `$1`, `$2`, etc. within any top-level `shell` code in the markdown file.
 
-For convenient access inside of shell functions, there is also a bash array, `$ARGV`, that contains the full command line given to jqmd, including the path to the markdown file itself.  (In other words, `${ARGV[0]}` contains the path to the markdown file, `${ARGV[1]}` is the first argument after it, and so on.)
-
-The `INCLUDE` *filename args...* function executes another file as if it were literally included in the current file at the point of execution.  And within the included file, the positional arguments and `$ARGV`  array reflect the arguments given to `INCLUDE`.  If you want the included file to see the same arguments, use `INCLUDE filename "$@"` (in top-level code) or `INCLUDE filename "${ARGV[@]:1}"` (inside a function).
-
-You aren't limited to including other markdown files, either.  The extension of the supplied  *filename* determines how the file's contents will be interpreted:
-
-* Filenames ending in `.md`, `.mdown`, or `.markdown` are processed as markdown files, with code block interpretation as described at the start of this document.  Additional arguments passed to `INCLUDE` are available via `$1`, `$2`, etc. and `$ARGV` as described above.
-* Filenames ending in `.env` are intepreted as shell scripts, and any variables they define will be **exported**, making them available for reading via jq's `env` function (jq 1.5 and up).  Additional arguments passed to `INCLUDE` are available via `$1`, `$2`, etc. and `$ARGV` as described above.
-* Files ending in `.jq`, `.yaml`, `.yml`, or  `.json` are processed the same as an equivalent-language block in a markdown file, with appropriate wrapping and/or translation before being added to the current filter pipeline.  Additional arguments passed to `INCLUDE` are ignored, so there is no difference between using `INCLUDE` on these file types and simply doing `FILTER <file.jq`, `YAML <file.yml`, or `JSON <file.json`.  (Indeed, `INCLUDE` is actually *less* flexible, because a valid filename is required!  The main usefulness of INCLUDE for these file types is when you don't know in advance what extension the file will have.)
-
-As with `mdsh`, you can define file extension handlers for extensions not listed above.  Handlers for a specific extension can be defined by creating bash functions named `mdsh-include-ext`, where `ext` is the file extension.  The longest-matching extension will be used, so `INCLUDE somefile.tar.gz` will call`mdsh-include-tar.gz` if it exists, falling back to `mdsh-include-gz` , and finally an error if no matching handler is found.
-
-If the file doesn't exist, lacks an extension, or no matching handler is found for that extension, an error message is written to stderr and the `INCLUDE` command fails, causing the overall script to terminate.
-
 ### Supporting Additional Languages
 
-By default, `jqmd` only interprets markdown blocks tagged as `shell`, `jq`, `yaml`, `yml`, or `json`.  As with `mdsh`, however, you can define interpreters for other block types by defining `mdsh-lang-X` functions in your `shell` blocks, a wrapper script, or as exported functions in your bash environment.  (You can also override these functions to change jqmd's default interpretation of jq, YAML, or JSON blocks.)
+By default, `jqmd` only interprets markdown blocks tagged as `shell`, `jq`, `yaml`, `yml`, or `json`.  As with `mdsh`, however, you can define interpreters for other block types by defining `mdsh-lang-X` functions in`mdsh` blocks, via a wrapper script, or as exported functions in your bash environment.  (You can also override these functions to change jqmd's default interpretation of jq, YAML, or JSON blocks.)
 
-When a code block of type `X` is encountered, the corresponding `mdsh-lang-X` function will be called with the contents of the block on the function's standard input.  (Note: the function name is case sensitive, so a block tagged `C` (uppercase) will not use a processor defined for `c` (lowercase) or vice-versa.)
+When a code block of type `X` is encountered, the corresponding `mdsh-lang-X` function will be called with the contents of the block on the function's standard input.  (Note: the function name is **case sensitive**, so a block tagged `C` (uppercase) will not use a processor defined for `c` (lowercase) or vice-versa.)
 
 If no corresponding language processor is defined when a block of type `X` is encountered, the contents of the block are appended to `$MDSH_TMP/unprocessed.X`, where `X` is the language tag on the code block, and `$MDSH_TMP` is an automatically-created temporary directory.  (You can then use the accumulated contents of these files at the end of your script, or read/write/delete the files as needed.)
 
@@ -170,7 +156,7 @@ and then delete the file.  (This can be useful when running language interpreter
 Another trick you can do with postprocessing hooks, is to automatically run jq after each `jq` block.  For example:
 
 > ~~~markdown
-> ​```shell
+> ​```mdsh
 > mdsh-after-jq() { RUN_JQ -- somefile.json ; }
 > ​```
 >
@@ -185,7 +171,7 @@ Another trick you can do with postprocessing hooks, is to automatically run jq a
 
 The above script will run `jq` twice on `somefile.json` with two different filters, instead of once with the results of the first filter being passed through the second.  (Because each run of `RUN_JQ` resets the filter pipeline.)  As always, however,`IMPORTS`, `DEFINES`, `JQ_OPTS`, `ARG` defs, etc. are retained from one jq run to the next.
 
-(Note that `mdsh` post-processing hooks are **only** applied to blocks found in the current markdown file or any `INCLUDE`d markdown files.  They do **not** run when `FILTER` ,  `YAML` , `JSON`, etc. are invoked programmatically, or upon`INCLUDE` of non-markdown files!)
+(Note that `mdsh` post-processing hooks are **only** applied to blocks found in the current markdown file.  They do **not** run when `FILTER` ,  `YAML` , `JSON`, etc. are invoked programmatically!)
 
 ## LICENSE
 
