@@ -76,12 +76,12 @@ export-dotenv() {
     [[ -z "$after" ]] || export $after
 }
 
-yaml2json() {
+command -v yaml2json >/dev/null || yaml2json() {
     python -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout, indent=4)';
 }
 
 HAVE_FILTERS() {
-    [[ -n ${jqmd_filters-} ]]
+    [[ ${jqmd_filters-} ]]
 }
 
 CLEAR_FILTERS() {
@@ -103,13 +103,13 @@ IMPORTS() { jqmd_imports+="${jqmd_imports:+$'\n'}$1"; }
 DEFINE()  { jqmd_defines+="${jqmd_defines:+$'\n'}$1"; }
 FILTER()  { jqmd_filters+="${jqmd_filters:+|}$1"; }
 
-YAML()    { JSON "$(echo "$1" | yaml2json)"; }
+YAML()    { JSON "$(echo "$1" | yaml2json -)"; }
 JSON()    { FILTER "jqmd_data($1)"; }
 
-mdsh-lang-jq()   { FILTER "$(cat)"; }
-mdsh-lang-yml()  { YAML "$(cat)"; }
-mdsh-lang-yaml() { YAML "$(cat)"; }
-mdsh-lang-json() { JSON "$(cat)"; }
+mdsh-compile-jq()   { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "$(mdsh-cat)"; }
+mdsh-compile-yml()  { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(yaml2json -))"; }
+mdsh-compile-yaml() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(yaml2json -))"; }
+mdsh-compile-json() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(mdsh-cat))"; }
 
 
 # check bash-source and run main only if directly executing

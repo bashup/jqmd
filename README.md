@@ -18,7 +18,7 @@ Running `jqmd some-document.md args...` will read and interpret triple-quoted co
 
 * `shell` -- interpreted as bash code, executed immediately.  Shell blocks can invoke various jqmd functions as described later in this document.
 * `jq` -- jq code, which is added to a jq filter pipeline for execution at the end of the file, or to be run explicitly with the `RUN_JQ` function.
-* `yaml`, `json` -- constant data, which is added to the jq filter pipeline as `jqmd_data(data)`; the effect of this depends on your definition of a `jqmd_data`  function as of the current point in the filter pipeline.  (Note: yaml data can only be processed if the system `python` interpreter has PyYAML installed; otherwise an error will occur.)
+* `yaml`, `json` -- constant data, which is added to the jq filter pipeline as `jqmd_data(data)`; the effect of this depends on your definition of a `jqmd_data`  function as of the current point in the filter pipeline.  (Note: yaml data can only be processed if there is a `yaml2json` executable on `PATH`, or the  system `python` interpreter has PyYAML installed; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as the process startup time alone is considerably smaller than Python's.)
 
 (As with `mdsh`, you can extend the above list by defining appropriate hook functions in `mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
 
@@ -106,7 +106,7 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 * `JSON`  *arg* -- a shortcut for  `FILTER "jqmd_data("`*arg*`")"`.  This function is the programmatic equivalent of including a `json` code block at the current point of execution.
 
-* `YAML` *arg* -- a shortcut for  `FILTER "jqmd_data("`*arg-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if the system default `python` has PyYAML installed.)
+* `YAML` *arg* -- a shortcut for  `FILTER "jqmd_data("`*arg-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, or the system default `python` has PyYAML installed.)
 
 Notice that JSON and YAML data are always filtered through a `jqmd_data()` function, which *your script must define*.  You are not required to keep this function the same, at all times, however.  You can redefine it at various points in your pipeline if you need to handle it.  (Just remember that within each filter block, you can begin with function definitions but *must* end with an expression, even if it's only a `.`.)
 
