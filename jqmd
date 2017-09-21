@@ -40,9 +40,9 @@
 # IN THE SOFTWARE.
 
 set -euo pipefail
-
 source "$(command -v mdsh)"
 
+# --- jqmd runtime begins
 RUN_JQ() {
     local opt nargs cmd=(jq) opts=("${JQOPTS[@]:1}" "$@")
 
@@ -80,16 +80,10 @@ command -v yaml2json >/dev/null || yaml2json() {
     python -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout, indent=4)';
 }
 
-HAVE_FILTERS() {
-    [[ ${jqmd_filters-} ]]
-}
-
-CLEAR_FILTERS() {
-    unset jqmd_filters
-}
+HAVE_FILTERS() { [[ ${jqmd_filters-} ]]; }
+CLEAR_FILTERS() { unset jqmd_filters; }
 
 JQOPTS=(jq)
-
 JQ_OPTS() { JQOPTS+=("$@"); }
 
 ARG()     { JQ_OPTS --arg     "$1" "$2"; }
@@ -106,18 +100,24 @@ FILTER()  { jqmd_filters+="${jqmd_filters:+|}$1"; }
 YAML()    { JSON "$(echo "$1" | yaml2json -)"; }
 JSON()    { FILTER "jqmd_data($1)"; }
 
+# -- jqmd runtime ends
+
+
+# mdsh compilation support
 mdsh-compile-jq()   { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "$(mdsh-cat)"; }
 mdsh-compile-yml()  { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(yaml2json -))"; }
 mdsh-compile-yaml() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(yaml2json -))"; }
 mdsh-compile-json() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(mdsh-cat))"; }
 
+# Change --compile and --eval to include the jqmd runtime and RUN_JQ logic
+eval "mdsh.--compile() $(mdsh-rewrite mdsh.--compile '{ jqmd-header' ' jqmd-footer; }')"
+
+jqmd-header() { sed -ne '/runtime begins$/,/runtime ends$/p' $BASH_SOURCE; echo; }
+jqmd-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
+
 
 # check bash-source and run main only if directly executing
-
-if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then
+if [[ $0 == $BASH_SOURCE ]]; then
     mdsh-main "$@"
-    if HAVE_FILTERS; then RUN_JQ; fi
-    exit $?
 fi
-
 
