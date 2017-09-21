@@ -24,13 +24,21 @@ Running `jqmd some-document.md args...` will read and interpret triple-quoted co
 
 Once all blocks have been executed or added to the filter pipeline, jq is run on standard input with the built-up filter pipeline, if any.  (If the filtering pipeline is empty, jq is not run.)  Filter pipeline elements are automatically separated with `|`,  so you should not include a `|` at the beginning or end of your `jq` blocks or `FILTER` code.
 
-As with `mdsh`, you can optionally make a markdown file executable by giving it a shebang line such as `#!/usr/bin/env jqmd`, or if you prefer not to make it a level one heading, you can put something like this on the first line instead:
+As with `mdsh`, you can optionally make a markdown file directly executable by giving it a shebang line such as `#!/usr/bin/env jqmd`, or use a [shelldown header](https://github.com/bashup/mdsh#making-sourceable-scripts-and-handling-0) to make it executable, sourceable, and pretty.  :)  A sample shelldown header for jqmd might look like:
 
-```sh
-``exec jqmd "$0" "$@"``
-```
+~~~markdown
+#!/usr/bin/env bash
+: '
+<!-- ex: set ft=markdown : '; eval "$(jqmd --eval "$BASH_SOURCE")" # -->
 
-Most markdown processors will treat the above as a standalone paragraph containing a bit of code, while most shells will interpret it as a POSIX `sh` command to run `jqmd` on the file, passing along any extra arguments.  (Unlike a `#!`  line, this won't work with all shells, nor will the file be executable *without* the use of a shell, so use this trick at your own risk!)
+# My Awesome Script
+
+...markdown and code start here...
+~~~
+
+Also as with `mdsh`, you can run `jqmd --compile` to output a bash version of your script, with no external dependencies (other than jq and maybe  `yaml2json` or PyYAML).  `jqmd --compile` and `jqmd --eval` both inject their runtime functions into
+
+(If you'd like more information on compiling, sourcing, and shelldown headers, feel free to have a look at the [mdsh docs](https://github.com/bashup/mdsh)!)
 
 ### Programming Models
 
@@ -167,9 +175,13 @@ The above script will run `jq` twice on `somefile.json` with two different filte
 
 (Note that `mdsh` post-processing hooks are **only** applied to blocks found in the current markdown file.  They do **not** run when `FILTER` ,  `YAML` , `JSON`, etc. are invoked programmatically!)
 
+#### Advanced Compilation Techniques
+
+`mdsh` actually allows for far more sophisticated code generation and metaprogramming than we've covered here: please consult its [docs](https://github.com/bashup/mdsh) for more details!
+
 ## LICENSE
 
-`jqmd` is copyright 2017 PJ Eby, and MIT-licensed as follows:
+Copyright 2017 PJ Eby
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
