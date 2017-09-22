@@ -42,7 +42,7 @@
 set -euo pipefail
 source "$(command -v mdsh)"
 
-# --- jqmd runtime begins
+jqmd-runtime() { # --- jqmd runtime begins
 RUN_JQ() {
     local opt nargs cmd=(jq) opts=("${JQOPTS[@]:1}" "$@")
 
@@ -100,7 +100,7 @@ FILTER()  { jqmd_filters+="${jqmd_filters:+|}$1"; }
 YAML()    { JSON "$(echo "$1" | yaml2json -)"; }
 JSON()    { FILTER "jqmd_data($1)"; }
 
-# -- jqmd runtime ends
+}; jqmd-runtime  # -- jqmd runtime ends
 
 
 # mdsh compilation support
@@ -112,7 +112,7 @@ mdsh-compile-json() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data
 # Change --compile and --eval to include the jqmd runtime and RUN_JQ logic
 eval "mdsh.--compile() $(mdsh-rewrite mdsh.--compile '{ jqmd-header' ' jqmd-footer; }')"
 
-jqmd-header() { sed -ne '/runtime begins$/,/runtime ends$/p' $BASH_SOURCE; echo; }
+jqmd-header() { mdsh-rewrite jqmd-runtime; }
 jqmd-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
 
 
