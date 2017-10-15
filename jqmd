@@ -104,10 +104,10 @@ JSON()    { FILTER "jqmd_data($1)"; }
 
 
 # mdsh compilation support
-mdsh-compile-jq()   { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "$(mdsh-cat)"; }
-mdsh-compile-yml()  { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(yaml2json -))"; }
-mdsh-compile-yaml() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(yaml2json -))"; }
-mdsh-compile-json() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(mdsh-cat))"; }
+mdsh-compile-jq()   { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "$1"; }
+mdsh-compile-yml()  { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(echo "$1" | yaml2json -))"; }
+mdsh-compile-yaml() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(echo "$1" | yaml2json -))"; }
+mdsh-compile-json() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($1))"; }
 
 # Change --compile and --eval to include the jqmd runtime and RUN_JQ logic
 eval "mdsh.--compile() $(mdsh-rewrite mdsh.--compile '{ jqmd-header' ' jqmd-footer; }')"
