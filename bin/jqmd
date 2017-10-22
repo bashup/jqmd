@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 # ---
 # This file was automatically generated from jqmd.md - DO NOT EDIT!
 # ---
@@ -18,7 +17,7 @@
 # FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-mdsh_raw_bash_runtime+=($'#!/usr/bin/env bash"\n\n# --- BEGIN jqmd runtime ---\n')
+mdsh_raw_bash_runtime+=($'#!/usr/bin/env bash\n\n# --- BEGIN jqmd runtime ---\n')
 mdsh_raw_bash_runtime+=($'jqmd_imports=\njqmd_filters=\njqmd_defines=\n\nHAVE_FILTERS() { [[ ${jqmd_filters-} ]]; }\nCLEAR_FILTERS() { unset jqmd_filters; }\n\nIMPORTS() { jqmd_imports+="${jqmd_imports:+$\'\\n\'}$1"; }\nDEFINE()  { jqmd_defines+="${jqmd_defines:+$\'\\n\'}$1"; }\nFILTER()  { jqmd_filters+="${jqmd_filters:+|}$1"; }\n')
 mdsh_raw_bash_runtime+=($'JQOPTS=(jq)\nJQ_OPTS() { JQOPTS+=("$@"); }\nARG()     { JQ_OPTS --arg     "$1" "$2"; }\nARGJSON() { JQ_OPTS --argjson "$1" "$2"; }\n')
 mdsh_raw_bash_runtime+=($'RUN_JQ() {\n    local opt nargs cmd=(jq) opts=("${JQOPTS[@]:1}" "$@")\n\n    while (("${#opts[@]}")); do\n        opt="${opts[0]}"\n        case "$opt" in\n        -{f,-fromfile})                     nargs=2 ; FILTER <"${opts[1]}" ;;\n        -{L,-indent})                       nargs=2 ;;\n        --{arg,arjgson,slurpfile,argfile})  nargs=3 ;;\n        --)  break   ;; # rest of args are data files\n        -*)  nargs=1 ;;\n        *)   FILTER "$opt"; break ;; # jq program: data files follow\n        esac\n        cmd+=("${opts[@]:0:$nargs}")    # add $nargs args to cmd\n        opts=("${opts[@]:$nargs}")      # shift $nargs args off opts\n    done\n\n    HAVE_FILTERS || FILTER .    # jq needs at least one filter expression\n\n    opts[0]=n/a; "${cmd[@]}" -f <(\n        printf "%s\\n" "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"\n    ) "${opts[@]:1}"\n\n    CLEAR_FILTERS   # cleanup for any re-runs\n}\n')
