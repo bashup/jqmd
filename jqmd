@@ -107,13 +107,10 @@ JSON()    { FILTER "jqmd_data($1)"; }
 mdsh-compile-jq()   { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "$1"; }
 mdsh-compile-yml()  { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(echo "$1" | yaml2json -))"; }
 mdsh-compile-yaml() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($(echo "$1" | yaml2json -))"; }
-mdsh-compile-json() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($1))"; }
+mdsh-compile-json() { printf 'jqmd_filters+="${jqmd_filters:+|}"%q\n' "jqmd_data($1)"; }
 
-# Change --compile and --eval to include the jqmd runtime and RUN_JQ logic
-eval "mdsh.--compile() $(mdsh-rewrite mdsh.--compile '{ jqmd-header' ' jqmd-footer; }')"
-
-jqmd-header() { mdsh-rewrite jqmd-runtime; }
-jqmd-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
+mdsh:file-header() { mdsh-rewrite jqmd-runtime; }
+mdsh:file-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
 
 
 # check bash-source and run main only if directly executing
