@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+dk use: cram              # run tests using the "cram" functional test tool
+dk use: entr-watch        # watch files and re-run tests or other commands
+dk use: shell-console     # make the "console" command enter a subshell
+
+# Define overrides, new commands, functions, etc. here:
