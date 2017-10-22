@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 : '
 <!-- ex: set syntax=markdown : '; eval "$(mdsh -E "$BASH_SOURCE")"; # -->
 
