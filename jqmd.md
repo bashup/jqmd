@@ -124,12 +124,10 @@ printf -v REPLY 'mdsh:file-header() { echo -n %q; }' "$REPLY"; eval "$REPLY"
 
 # Ensure scripts process any leftover filters at end
 mdsh:file-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
-
-# --- END jqmd ---
 ```
 
 Finally, we include the source of mdsh directly, so our compiled version won't need it installed:
 
 ```mdsh
-echo; cat "$(command -v mdsh)"
+sed -e '1,4d; /^# Copyright (c) 2017 PJ Eby/,/^$/d'  "$(command -v mdsh)"
 ```
