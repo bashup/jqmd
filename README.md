@@ -12,6 +12,27 @@ basher install bashup/jqmd
 
 If you don't have or want `basher`, though, you'll need to manually install `mdsh` first, then copy the `jqmd` script from this repository onto your path.
 
+**Contents**
+
+<!-- toc -->
+
+- [Usage](#usage)
+- [Programming Models](#programming-models)
+  * [Filters](#filters)
+  * [**Scripts**](#scripts)
+  * [Extensions](#extensions)
+- [Available Functions](#available-functions)
+  * [Adding jq Code and Data](#adding-jq-code-and-data)
+  * [Adding jq Options and Arguments](#adding-jq-options-and-arguments)
+  * [Controlling jq Execution](#controlling-jq-execution)
+  * [Command-line Arguments](#command-line-arguments)
+- [Supporting Additional Languages](#supporting-additional-languages)
+  * [Postprocessing Code or Data Blocks](#postprocessing-code-or-data-blocks)
+  * [Advanced Compilation Techniques](#advanced-compilation-techniques)
+- [LICENSE](#license)
+
+<!-- tocstop -->
+
 ### Usage
 
 Running `jqmd some-document.md args...` will read and interpret triple-quoted code blocks from `some-document.md`, according to the language listed on the block:
@@ -179,7 +200,7 @@ The above script will run `jq` twice on `somefile.json` with two different filte
 
 `mdsh` actually allows for far more sophisticated code generation and metaprogramming than we've covered here: please consult its [docs](https://github.com/bashup/mdsh) for more details!
 
-## LICENSE
+### LICENSE
 
 Copyright 2017 PJ Eby
 
