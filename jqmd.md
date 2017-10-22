@@ -20,7 +20,7 @@ Followed by its license text:
 ```shell mdsh
 # incorporate the LICENSE file as bash comments
 source realpaths; realpath.location "$MDSH_SOURCE"
-echo; sed -e 's/^\(.\)/# \1/; s/^$/#/;' "$REPLY/LICENSE"; echo
+echo; sed -e '1,2d; s/^\(.\)/# \1/; s/^$/#/;' "$REPLY/LICENSE"; echo
 ```
 
 
