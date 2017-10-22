@@ -1,2 +1,1 @@
-DEPS=bashup/mdsh
-BINS=jqmd
+BINS=bin/jqmd

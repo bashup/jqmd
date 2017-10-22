@@ -2,7 +2,7 @@
 
 `jqmd` is a tool for writing well-documented, complex manipulations of YAML or JSON data structures using bash scripting and `jq`.  It allows you to mix both kinds of code -- plus snippets of YAML or JSON data! -- within one or more markdown documents, making it easier to write scripts that do complex things like generate `docker-compose` configurations or manipulate serialized Wordpress options.  (It can even read `.env` files and make the variables accessible from jq expressions!)
 
-`jqmd` is implemented as an [`mdsh`](https://github.com/bashup/mdsh) extension, which means you can extend it to process additional kinds of code blocks by defining functions inside your `mdsh` blocks.  (It also means you need `mdsh` on your path!)
+`jqmd` is implemented as an extension of [`mdsh`](https://github.com/bashup/mdsh), which means you can extend it to process additional kinds of code blocks by defining functions inside your `mdsh` blocks.  But you do not need to install mdsh, and you can use `jqmd --compile` to make distributable scripts that don't require jqmd *or* mdsh.
 
 **Contents**
 
@@ -28,13 +28,7 @@
 
 ### Installation
 
-If you have [`basher`](https://github.com/basherpm/basher) on your system, it's the easiest way to install `jqmd`, as it will automatically install `mdsh` as part of the installation.  Just run:
-
-```shell
-basher install bashup/jqmd
-```
-
-If you don't have or want `basher`, though, you'll need to manually install `mdsh` first, then copy the `jqmd` script from this repository onto your path.
+If you have [`basher`](https://github.com/basherpm/basher) on your system, you can install jqmd with `basher install bashup/jqmd`; otherwise, just download the [jqmd executable](bin/jqmd), `chmod +x` it, and put it in a directory on your `PATH`.
 
 ### Usage
 
@@ -60,7 +54,7 @@ As with `mdsh`, you can optionally make a markdown file directly executable by g
 ...markdown and code start here...
 ~~~
 
-Also as with `mdsh`, you can run `jqmd --compile` to output a bash version of your script, with no external dependencies (other than jq and maybe  `yaml2json` or PyYAML).  `jqmd --compile` and `jqmd --eval` both inject their runtime functions into
+Also as with `mdsh`, you can run `jqmd --compile` to output a bash version of your script, with no external dependencies (other than jq and maybe  `yaml2json` or PyYAML).  `jqmd --compile` and `jqmd --eval` both inject the necessary jqmd runtime functions into the script so that it will work on systems without jqmd installed.
 
 (If you'd like more information on compiling, sourcing, and shelldown headers, feel free to have a look at the [mdsh docs](https://github.com/bashup/mdsh)!)
 

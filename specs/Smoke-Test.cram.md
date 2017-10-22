@@ -14,5 +14,5 @@
     > JQ_OPTS -n
     > ```
     > -
-    $ $TESTDIR/../jqmd test.md
+    $ $TESTDIR/../jqmd.md test.md
     "y"
