@@ -4,18 +4,11 @@
 
 `jqmd` is implemented as an [`mdsh`](https://github.com/bashup/mdsh) extension, which means you can extend it to process additional kinds of code blocks by defining functions inside your `mdsh` blocks.  (It also means you need `mdsh` on your path!)
 
-If you have [`basher`](https://github.com/basherpm/basher) on your system, it's the easiest way to install `jqmd`, as it will automatically install `mdsh` as part of the installation.  Just run:
-
-```shell
-basher install bashup/jqmd
-```
-
-If you don't have or want `basher`, though, you'll need to manually install `mdsh` first, then copy the `jqmd` script from this repository onto your path.
-
 **Contents**
 
 <!-- toc -->
 
+- [Installation](#installation)
 - [Usage](#usage)
 - [Programming Models](#programming-models)
   * [Filters](#filters)
@@ -32,6 +25,16 @@ If you don't have or want `basher`, though, you'll need to manually install `mds
 - [LICENSE](#license)
 
 <!-- tocstop -->
+
+### Installation
+
+If you have [`basher`](https://github.com/basherpm/basher) on your system, it's the easiest way to install `jqmd`, as it will automatically install `mdsh` as part of the installation.  Just run:
+
+```shell
+basher install bashup/jqmd
+```
+
+If you don't have or want `basher`, though, you'll need to manually install `mdsh` first, then copy the `jqmd` script from this repository onto your path.
 
 ### Usage
 
