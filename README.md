@@ -19,7 +19,7 @@ If you don't have or want `basher`, though, you'll need to manually install `mds
 - [Usage](#usage)
 - [Programming Models](#programming-models)
   * [Filters](#filters)
-  * [**Scripts**](#scripts)
+  * [Scripts](#scripts)
   * [Extensions](#extensions)
 - [Available Functions](#available-functions)
   * [Adding jq Code and Data](#adding-jq-code-and-data)
@@ -72,7 +72,7 @@ Also as with `mdsh`, you can run `jqmd --compile` to output a bash version of yo
 #### Filters
 Filters are programs that build up a single giant jq pipeline, and then act as a filter, typically taking JSON input from stdin and sending the result to stdout.  If your markdown document defines at least one filter, and doesn't use `RUN_JQ` or `CLEAR_FILTERS` to reset the pipeline, it's a filter.  `jqmd` will automatically run `jq` to do the filtering from stdin to stdout, after the *entire markdown document* has been processed.  If you don't want jq to read from stdin, you can use `JQ_OPTS -n` within your script to start the filter pipeline without any file input.  (Similarly, you can use `JQ_OPTS -- somefile` to force jq to read input from a specific file instead of stdin.)
 
-#### **Scripts**
+#### Scripts
 
 If your program isn't a filter, it's probably a script.  Scripts can run jq with shared imports, functions, and arguments, using the `RUN_JQ` function.  (They must not add anything to the filter pipeline after the last `RUN_JQ` or `CLEAR_FILTERS` call, though, or `jqmd` will think the program's a filter!)
 
