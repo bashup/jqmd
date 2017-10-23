@@ -77,27 +77,26 @@ ARGJSON() { JQ_OPTS --argjson "$1" "$2"; }
 
 ```bash runtime
 RUN_JQ() {
-    local opt nargs cmd=(jq) opts=("${JQOPTS[@]:1}" "$@")
+    local opt nargs cmd=(jq); set -- "${JQOPTS[@]:1}" "$@"
 
-    while (("${#opts[@]}")); do
-        opt="${opts[0]}"
-        case "$opt" in
-        -{f,-fromfile})                     nargs=2 ; FILTER <"${opts[1]}" ;;
+    while (($#)); do
+        case "$1" in
+        -{f,-fromfile})                     nargs=2 ; FILTER "$(<"$2")" ;;
         -{L,-indent})                       nargs=2 ;;
         --{arg,arjgson,slurpfile,argfile})  nargs=3 ;;
         --)  break   ;; # rest of args are data files
         -*)  nargs=1 ;;
-        *)   FILTER "$opt"; break ;; # jq program: data files follow
+        *)   FILTER "$1"; break ;; # jq program: data files follow
         esac
-        cmd+=("${opts[@]:0:$nargs}")    # add $nargs args to cmd
-        opts=("${opts[@]:$nargs}")      # shift $nargs args off opts
+        cmd+=("${@:1:$nargs}")    # add $nargs args to cmd
+        shift $nargs
     done
 
     HAVE_FILTERS || FILTER .    # jq needs at least one filter expression
 
-    opts[0]=n/a; "${cmd[@]}" -f <(
+    "${cmd[@]}" -f <(
         printf "%s\n" "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"
-    ) "${opts[@]:1}"
+    ) "${@:2}"
 
     CLEAR_FILTERS   # cleanup for any re-runs
 }
