@@ -6,7 +6,7 @@
 
 jqmd is an mdsh extension written as a literate program using mdsh.  Within this source file, `shell` code blocks are the main program, while `bash runtime` blocks are captured as data to be used as part of the runtime compiled into jqmd programs.
 
-**Contents**
+### Contents
 
 <!-- toc -->
 
@@ -123,8 +123,8 @@ The non-runtime part of the program defines hooks for mdsh to be able to compile
 ```shell
 # Language Support
 mdsh-compile-jq()   { printf 'FILTER %q\n' "$1"; }
-mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json -))"; }
-mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json -))"; }
+mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json -)"; }
+mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json -)"; }
 mdsh-compile-json() { printf 'JSON %q\n' "$1"; }
 ```
 

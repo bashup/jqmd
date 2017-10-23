@@ -24,8 +24,8 @@ mdsh_raw_bash_runtime+=($'RUN_JQ() {\n    local opt nargs cmd=(jq) opts=("${JQOP
 mdsh_raw_bash_runtime+=($'YAML()    { JSON "$(echo "$1" | yaml2json -)"; }\nJSON()    { FILTER "jqmd_data($1)"; }\n\ncommand -v yaml2json >/dev/null || yaml2json() {\n    python -c \'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout, indent=4)\';\n}\n\n# --- END jqmd runtime ---\n')
 # Language Support
 mdsh-compile-jq()   { printf 'FILTER %q\n' "$1"; }
-mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json -))"; }
-mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json -))"; }
+mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json -)"; }
+mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json -)"; }
 mdsh-compile-json() { printf 'JSON %q\n' "$1"; }
 # Load the runtime so it's usable by mdsh
 printf -v REPLY '%s\n' "${mdsh_raw_bash_runtime[@]}"; eval "$REPLY"

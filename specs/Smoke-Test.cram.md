@@ -2,17 +2,20 @@
 
     $ cat <<'-' >test.md
     > ```jq
-    > def jqmd_data($x): $x; .
+    > def jqmd_data($x): . + $x; .
     > ```
     > ```json
     > { "x": "y" }
     > ```
-    > ```jq
-    > .x
+    > ```yaml
+    > a: b
     > ```
     > ```shell
     > JQ_OPTS -n
     > ```
     > -
     $ $TESTDIR/../jqmd.md test.md
-    "y"
+    {
+      "x": "y",
+      "a": "b"
+    }
