@@ -35,6 +35,8 @@ Running `jqmd some-document.md args...` will read and interpret triple-quoted co
 
 * `shell` -- interpreted as bash code, executed immediately.  Shell blocks can invoke various jqmd functions as described later in this document.
 * `jq` -- jq code, which is added to a jq filter pipeline for execution at the end of the file, or to be run explicitly with the `RUN_JQ` function.
+* `jq defs` -- jq function definitions, which are accumulated over the course of the program run, and included at the start of any executed filter pipelines
+* `jq imports` -- jq module includes or imports, which are accumulated over the course of the program run, and included at the start of any executed filter pipelines (before the current set of `jq defs`).
 * `yaml`, `json` -- constant data, which is added to the jq filter pipeline as `jqmd_data(data)`; the effect of this depends on your definition of a `jqmd_data`  function as of the current point in the filter pipeline.  (Note: yaml data can only be processed if there is a `yaml2json` executable on `PATH`, or the  system `python` interpreter has PyYAML installed; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as the process startup time alone is considerably smaller than Python's.)
 
 (As with `mdsh`, you can extend the above list by defining appropriate hook functions in `mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
@@ -100,9 +102,13 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 * `IMPORTS` *arg* -- add the given jq `import` or `include` statements to a block that will appear at the very beginning of the jq "program".  (Each statement must be terminated with `;`, as is standard for jq.)  Imports are accumulated in the order they are processed, but *all* imports active as of a given jq run will be placed at the beginning of the overall program, as required by jq syntax.
 
+  (This function is the programmatic equivalent of including a `jq imports` code block at the current point of execution.)
+
 * `DEFINE` *arg* -- add the given jq `def` statements to a block that will appear after the `IMPORTS`, but *before* any filters.  (Each statement must be terminated with `;`, as is standard for jq.)
 
-  Note: you do **not** have to define all your functions this way.  Functions can also be defined at the beginning of `FILTER` blocks or `jq`-tagged code blocks.  The main benefits of using `DEFINE` blocks are that:
+  This function is the programmatic equivalent of including a `jq defs` code block at the current point of execution.
+
+  Note: you do **not** have to define all your functions this way.  Functions can also be defined at the beginning of `FILTER` blocks or `jq`-tagged code blocks.  The main benefits of using `DEFINE` or `jq defs` blocks are that:
 
   - They can be done "out of order" within a document: you can use a function in a `jq` or `FILTER` block *before* its `DEFINE` block appears, as long as the `DEFINE` happens before jq is actually run.
 
