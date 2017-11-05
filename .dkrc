@@ -13,7 +13,5 @@ dk.bootstrap() {
 }
 
 dk.build() {
-    dk test || abort "tests failed; not building" $?
-    REPLY=$(mdsh --compile jqmd.md) || abort "compile failed with $?" $?
-    echo "$REPLY" >bin/jqmd
+    dk test && mdsh --out bin/jqmd --compile jqmd.md
 }
