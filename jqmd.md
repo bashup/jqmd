@@ -117,7 +117,7 @@ command -v yaml2json >/dev/null || yaml2json() {
 
 ## Main Program
 
-The non-runtime part of the program defines hooks for mdsh to be able to compile jq, yaml, and json blocks:
+The non-runtime part of the program defines hooks for mdsh to be able to compile jq, yaml, and json blocks and constants:
 
 ```shell
 # Language Support
@@ -128,6 +128,14 @@ mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"; }
 mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json /dev/stdin)"; }
 mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json /dev/stdin)"; }
 mdsh-compile-json() { printf 'JSON %q\n' "$1"; }
+
+const() {
+    case "${tag_words-}" in
+    yaml|yml) printf "DEFINE %q\n" "def $1: $(echo "$block"|yaml2json /dev/stdin) ;" ;;
+    json)     printf "DEFINE %q\n" "def $1: $block ;" ;;
+    *) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
+    esac
+}
 ```
 
 It also evals the runtime, and defines header/footer hooks to embed the runtime in compiled scripts, and to ensure jq is run at the script's end if there are any leftover filters:

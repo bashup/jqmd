@@ -1,4 +1,4 @@
-## Basic check that jqmd handles jq and json blocks, JQ_OPTS, post-run RUN_JQ, etc.:
+## Basic check that jqmd handles jq and json blocks, const, JQ_OPTS, post-run RUN_JQ, etc.:
 
     $ cat <<'-' >test.md
     > ```jq
@@ -7,11 +7,11 @@
     > ```json
     > { "x": "y" }
     > ```
-    > ```yaml
+    > ```yaml ! const foo
     > a: b
     > ```
     > ```shell
-    > JQ_OPTS -n
+    > JQ_OPTS -n '. + foo'
     > ```
     > -
     $ $TESTDIR/../jqmd.md test.md

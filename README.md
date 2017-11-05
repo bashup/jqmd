@@ -34,10 +34,27 @@ If you have [`basher`](https://github.com/basherpm/basher) on your system, you c
 Running `jqmd some-document.md args...` will read and interpret unindented, triple-backquote fenced code blocks from `some-document.md`, according to the language listed on the block:
 
 * `shell` -- interpreted as bash code, executed immediately.  Shell blocks can invoke various jqmd functions as described later in this document.
+
 * `jq` -- jq code, which is added to a jq filter pipeline for execution at the end of the file, or to be run explicitly with the `RUN_JQ` function.
+
 * `jq defs` -- jq function definitions, which are accumulated over the course of the program run, and included at the start of any executed filter pipelines
+
 * `jq imports` -- jq module includes or imports, which are accumulated over the course of the program run, and included at the start of any executed filter pipelines (before the current set of `jq defs`).
-* `yaml`, `json` -- constant data, which is added to the jq filter pipeline as `jqmd_data(data)`; the effect of this depends on your definition of a `jqmd_data`  function as of the current point in the filter pipeline.  (Note: yaml data can only be processed if there is a `yaml2json` executable on `PATH`, or the  system `python` interpreter has PyYAML installed; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as the process startup time alone is considerably smaller than Python's.)
+
+* `yaml`, `json` -- constant data, which is added to the jq filter pipeline as `jqmd_data(data)`; the effect of this depends on your definition of a `jqmd_data`  function as of the current point in the filter pipeline.  Constant blocks can also be tagged as named constants: a code block starting with e.g. `````yaml !const foo`` will have its contents defined as a zero-argument jq function named `foo`.
+
+  That is, the following two code blocks do the exact same thing:
+
+  ~~~markdown
+  ​```jq defs
+  def pi: 3.14159;
+  ​```
+  ​```json !const pi
+  3.14159
+  ​```
+  ~~~
+
+  (Note: YAML data can only be processed if there is a `yaml2json` executable on `PATH`, or the  system `python` interpreter has PyYAML installed; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as the process startup time alone is considerably smaller than Python's.)
 
 (As with `mdsh`, you can extend the above list by defining appropriate hook functions in `mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
 
