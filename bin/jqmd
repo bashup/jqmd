@@ -21,11 +21,14 @@ mdsh_raw_bash_runtime+=($'#!/usr/bin/env bash\n\n# --- BEGIN jqmd runtime ---\n'
 mdsh_raw_bash_runtime+=($'jqmd_imports=\njqmd_filters=\njqmd_defines=\n\nHAVE_FILTERS() { [[ ${jqmd_filters-} ]]; }\nCLEAR_FILTERS() { unset jqmd_filters; }\n\nIMPORTS() { jqmd_imports+="${jqmd_imports:+$\'\\n\'}$1"; }\nDEFINE()  { jqmd_defines+="${jqmd_defines:+$\'\\n\'}$1"; }\nFILTER()  { jqmd_filters+="${jqmd_filters:+|}$1"; }\n')
 mdsh_raw_bash_runtime+=($'JQOPTS=(jq)\nJQ_OPTS() { JQOPTS+=("$@"); }\nARG()     { JQ_OPTS --arg     "$1" "$2"; }\nARGJSON() { JQ_OPTS --argjson "$1" "$2"; }\n')
 mdsh_raw_bash_runtime+=($'RUN_JQ() {\n    local opt nargs cmd=(jq); set -- "${JQOPTS[@]:1}" "$@"\n\n    while (($#)); do\n        case "$1" in\n        -{f,-fromfile})                     nargs=2 ; FILTER "$(<"$2")" ;;\n        -{L,-indent})                       nargs=2 ;;\n        --{arg,arjgson,slurpfile,argfile})  nargs=3 ;;\n        --)  break   ;; # rest of args are data files\n        -*)  nargs=1 ;;\n        *)   FILTER "$1"; break ;; # jq program: data files follow\n        esac\n        cmd+=("${@:1:$nargs}")    # add $nargs args to cmd\n        shift $nargs\n    done\n\n    HAVE_FILTERS || FILTER .    # jq needs at least one filter expression\n\n    "${cmd[@]}" -f <(\n        printf "%s\\n" "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"\n    ) "${@:2}"\n\n    CLEAR_FILTERS   # cleanup for any re-runs\n}\n')
-mdsh_raw_bash_runtime+=($'YAML()    { JSON "$(echo "$1" | yaml2json -)"; }\nJSON()    { FILTER "jqmd_data($1)"; }\n\ncommand -v yaml2json >/dev/null || yaml2json() {\n    python -c \'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout, indent=4)\';\n}\n\n# --- END jqmd runtime ---\n')
+mdsh_raw_bash_runtime+=($'YAML()    { JSON "$(echo "$1" | yaml2json /dev/stdin)"; }\nJSON()    { FILTER "jqmd_data($1)"; }\n\ncommand -v yaml2json >/dev/null || yaml2json() {\n    python -c \'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout, indent=4)\';\n}\n\n# --- END jqmd runtime ---\n')
 # Language Support
-mdsh-compile-jq()   { printf 'FILTER %q\n' "$1"; }
-mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json -)"; }
-mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json -)"; }
+mdsh-compile-jq()         { printf 'FILTER  %q\n' "$1"; }
+mdsh-compile-jq_defs()    { printf 'DEFINE  %q\n' "$1"; }
+mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"; }
+
+mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json /dev/stdin)"; }
+mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json /dev/stdin)"; }
 mdsh-compile-json() { printf 'JSON %q\n' "$1"; }
 # Load the runtime so it's usable by mdsh
 printf -v REPLY '%s\n' "${mdsh_raw_bash_runtime[@]}"; eval "$REPLY"
@@ -65,8 +68,12 @@ mdsh-compile() (  # <-- force subshell to prevent escape of compile-time state
 __COMPILE__() {
     [[ $1 == backquote-fenced ]] || return 0  # only fenced code
     local lang="${2//[^_[:alnum:]]/_}"; # convert language to safe variable/function name
-
-    if fn-exists mdsh-lang-$lang; then
+    local tag_words=($2);  # check for command blocks first
+    if [[ ${tag_words[1]-} == '!'* ]]; then
+        set -- "$3" "$2"; eval "${2#*!}"; return
+    elif [[ ${tag_words[1]-} == '|'* ]]; then
+        echo "${2#*|} <<'\`\`\`'"; printf '%s```\n' "$3"; return
+    elif fn-exists mdsh-lang-$lang; then
         mdsh-rewrite mdsh-lang-$lang "{" "} <<'\`\`\`'"; printf '%s```\n' "$3"
     elif fn-exists mdsh-compile-$lang; then
         mdsh-compile-$lang "$3"
@@ -96,13 +103,13 @@ mdsh-compile-shell_mdsh() {
 }
 # Main program: check for arguments and run markdown script
 mdsh-main() {
-    (($#)) || mdsh-error "Usage: %s [ --compile | --eval ] markdownfile [args...]" "${0#*/}"
+    (($#)) || mdsh-error "Usage: %s [--out FILE] [ --compile | --eval ] markdownfile [args...]" "${0#*/}"
     case "$1" in
     --) mdsh-interpret "${@:2}" ;;
-    -)  mdsh-interpret "$@" ;;
-    -*) fn-exists "mdsh.$1" || mdsh-error "%s: unrecognized option: %s" "${0#*/}" "$1"
+    --*|-?) fn-exists "mdsh.$1" || mdsh-error "%s: unrecognized option: %s" "${0#*/}" "$1"
         "mdsh.$1" "${@:2}"
         ;;
+    -??*) mdsh-main "${1::2}" "-${1:2}" "${@:2}" ;;  # split '-abc' into '-a -bc' and recurse
     *)  mdsh-interpret "$@" ;;
     esac
 }
@@ -129,10 +136,18 @@ mdsh.--eval() {
 }
 
 mdsh.-E() { mdsh.--eval "$@"; }
+mdsh.--out() {
+    if REPLY=("$(mdsh-main "${@:2}")"); then
+        echo "$REPLY" >"$1";
+    else exit $?;
+    fi
+}
+
+mdsh.-o() { mdsh.--out "$@"; }
 # mdsh-error: printf args to stderr and exit w/EX_USAGE (code 64)
 mdsh-error() { printf "$1\n" "${@:2}" >&2; exit 64; }
 mdsh.--help() {
-    printf "Usage: %s [ --compile | --eval ] markdownfile [args...]\n" "${0#*/}"
+    printf "Usage: %s [--out FILE] [ --compile | --eval ] markdownfile [args...]\n" "${0#*/}"
     echo -e '
 Run and/or compile code blocks from markdownfile(s) to bash.
 Use a filename of `-` to run or compile from stdin.
@@ -144,6 +159,17 @@ Options:
 }
 
 mdsh.-h() { mdsh.--help "$@"; }
+mdsh-embed() {
+    local f=$1 base=${1##*/}; local boundary="# --- EOF $base ---" contents ctr=
+    [[ $f == */* && -f $f ]] || f=$(command -v "$f") || {
+        echo "Can't find module $1" >&2; return 69  # EX_UNAVAILABLE
+    }
+    contents=$'\n'$(<"$f")$'\n'
+    while [[ $contents == *$'\n'"$boundary"$'\n'* ]]; do
+        let ctr++; boundary="# --- EOF $base.$ctr ---"
+    done
+    printf $'{ if [[ $OSTYPE != cygwin && $OSTYPE != msys && -e /dev/fd/0 ]]; then source /dev/fd/0; else source <(cat); fi; } <<\'%s\'%s%s\n' "$boundary" "$contents" "$boundary"
+}
 # run-markdown file args...
 # Compile `file` and source the result, passing along any positional arguments
 run-markdown() { source <(mdsh-compile <"$1") "${@:2}"; }
