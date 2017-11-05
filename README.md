@@ -1,6 +1,6 @@
 ## Literate jq+shell Programming with `jqmd`
 
-`jqmd` is a tool for writing well-documented, complex manipulations of YAML or JSON data structures using bash scripting and `jq`.  It allows you to mix both kinds of code -- plus snippets of YAML or JSON data! -- within one or more markdown documents, making it easier to write scripts that do complex things like generate `docker-compose` configurations or manipulate serialized Wordpress options.  (It can even read `.env` files and make the variables accessible from jq expressions!)
+`jqmd` is a tool for writing well-documented, complex manipulations of YAML or JSON data structures using bash scripting and `jq`.  It allows you to mix both kinds of code -- plus snippets of YAML or JSON data! -- within one or more markdown documents, making it easier to write scripts that do complex things like generate `docker-compose` configurations or manipulate serialized Wordpress options.
 
 `jqmd` is implemented as an extension of [`mdsh`](https://github.com/bashup/mdsh), which means you can extend it to process additional kinds of code blocks by defining functions inside your `mdsh` blocks.  But you do not need to install mdsh, and you can use `jqmd --compile` to make distributable scripts that don't require jqmd *or* mdsh.
 
@@ -31,7 +31,7 @@ If you have [`basher`](https://github.com/basherpm/basher) on your system, you c
 
 ### Usage
 
-Running `jqmd some-document.md args...` will read and interpret triple-quoted code blocks from `some-document.md`, according to the language listed on the block:
+Running `jqmd some-document.md args...` will read and interpret unindented, triple-backquote fenced code blocks from `some-document.md`, according to the language listed on the block:
 
 * `shell` -- interpreted as bash code, executed immediately.  Shell blocks can invoke various jqmd functions as described later in this document.
 * `jq` -- jq code, which is added to a jq filter pipeline for execution at the end of the file, or to be run explicitly with the `RUN_JQ` function.
