@@ -105,7 +105,7 @@ RUN_JQ() {
 ### YAML and JSON data
 
 ```bash runtime
-YAML()    { JSON "$(echo "$1" | yaml2json -)"; }
+YAML()    { JSON "$(echo "$1" | yaml2json /dev/stdin)"; }
 JSON()    { FILTER "jqmd_data($1)"; }
 
 command -v yaml2json >/dev/null || yaml2json() {
@@ -125,8 +125,8 @@ mdsh-compile-jq()         { printf 'FILTER  %q\n' "$1"; }
 mdsh-compile-jq_defs()    { printf 'DEFINE  %q\n' "$1"; }
 mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"; }
 
-mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json -)"; }
-mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json -)"; }
+mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json /dev/stdin)"; }
+mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json /dev/stdin)"; }
 mdsh-compile-json() { printf 'JSON %q\n' "$1"; }
 ```
 
