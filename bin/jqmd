@@ -48,21 +48,14 @@ printf -v REPLY 'mdsh:file-header() { echo -n %q; }' "$REPLY"; eval "$REPLY"
 mdsh:file-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
 set -euo pipefail  # Strict mode
 
-
-# read line from variable named by $1, reply in variable named by $2 (or REPLY)
-mdsh-read() {
-    [[ ${!1} && ${!1} =~ ^([^$'\n']*)($'\n'|$) ]] || return 1
-    printf -v "${2-REPLY}" %s "${BASH_REMATCH[1]}"
-    printf -v "$1"         %s "${!1#"$BASH_REMATCH"}"
-}
 mdsh-parse() {
-    local cmd=$1 lang block md=$2 ln indent fence close_fence indent_remove
+    local cmd=$1 lang block ln indent fence close_fence indent_remove
     local open_fence='^( {0,3})(~~~+|```+) *([^`]*)$'
-    while mdsh-read md ln; do
+    while IFS= read -r ln; do
         if [[ $ln =~ $open_fence ]]; then
             indent=${BASH_REMATCH[1]} fence=${BASH_REMATCH[2]} lang=${BASH_REMATCH[3]} block=
             close_fence="^( {0,3})$fence+ *\$" indent_remove="^${indent// / ?}"
-            while mdsh-read md ln && ! [[ $ln =~ $close_fence ]]; do
+            while IFS= read -r ln && ! [[ $ln =~ $close_fence ]]; do
                 ! [[ $ln =~ $indent_remove ]] || ln=${ln#$BASH_REMATCH}; block+=$ln$'\n'
             done
             lang="${lang%"${lang##*[![:space:]]}"}"; $cmd fenced "$lang" "$block";
@@ -71,7 +64,7 @@ mdsh-parse() {
 }
 mdsh-compile() (  # <-- force subshell to prevent escape of compile-time state
     (($#)) && [[ $1 != '-' ]] && exec <"$1"  # take a file or stdin
-    REPLY=$(cat; echo -n _); mdsh-parse __COMPILE__ "${REPLY%_}"
+    mdsh-parse __COMPILE__
 )
 __COMPILE__() {
     [[ $1 == fenced && $fence == '```' && ! $indent ]] || return 0  # only unindented ``` code
@@ -177,6 +170,11 @@ mdsh-embed() {
         let ctr++; boundary="# --- EOF $base.$ctr ---"
     done
     printf $'{ if [[ $OSTYPE != cygwin && $OSTYPE != msys && -e /dev/fd/0 ]]; then source /dev/fd/0; else source <(cat); fi; } <<\'%s\'%s%s\n' "$boundary" "$contents" "$boundary"
+}
+mdsh-make() {
+    [[ -f "$2" && "$(stat -c %y "$1")" == "$(stat -c %y "$2")" ]] || (
+        "${@:3}" && mdsh-main --out "$2" --compile "$1" && touch -r "$1" "$2"
+    )
 }
 # run-markdown file args...
 # Compile `file` and source the result, passing along any positional arguments
