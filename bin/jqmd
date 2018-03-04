@@ -47,7 +47,6 @@ printf -v REPLY 'mdsh:file-header() { echo -n %q; }' "$REPLY"; eval "$REPLY"
 # Ensure scripts process any leftover filters at end
 mdsh:file-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
 set -euo pipefail  # Strict mode
-
 mdsh-parse() {
     local cmd=$1 lang block ln indent fence close_fence indent_remove
     local open_fence='^( {0,3})(~~~+|```+) *([^`]*)$'

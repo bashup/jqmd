@@ -24,7 +24,7 @@ jqmd is an mdsh extension written as a literate program using mdsh.  Within this
 
 The main program begins with a `#!` line and edit warning:
 
-```shell
+```shell main
 #!/usr/bin/env bash
 # ---
 # This file was automatically generated from jqmd.md - DO NOT EDIT!
@@ -33,7 +33,7 @@ The main program begins with a `#!` line and edit warning:
 
 Followed by its license text:
 
-```shell mdsh
+```shell mdsh main
 # incorporate the LICENSE file as bash comments
 source realpaths; realpath.location "$MDSH_SOURCE"
 echo; sed -e '1,2d; s/^\(.\)/# \1/; s/^$/#/;' "$REPLY/LICENSE"; echo
@@ -153,6 +153,6 @@ mdsh:file-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN
 
 Finally, we include the source of mdsh directly, so our compiled version won't need it installed:
 
-```mdsh
-sed -e '1,4d; /^# Copyright (c) 2017 PJ Eby/,/^$/d'  "$(command -v mdsh)"
+```shell mdsh
+mdsh-module bashup/mdsh mdsh-source "$BASHER_PACKAGES_PATH/bashup/mdsh/mdsh.md"
 ```
