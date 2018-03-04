@@ -22,21 +22,11 @@ jqmd is an mdsh extension written as a literate program using mdsh.  Within this
 
 ## File Header
 
-The main program begins with a `#!` line and edit warning:
-
-```shell main
-#!/usr/bin/env bash
-# ---
-# This file was automatically generated from jqmd.md - DO NOT EDIT!
-# ---
-```
-
-Followed by its license text:
+The main program begins with a `#!` line and edit warning, followed by its license text::
 
 ```shell mdsh main
-# incorporate the LICENSE file as bash comments
-source realpaths; realpath.location "$MDSH_SOURCE"
-echo; sed -e '1,2d; s/^\(.\)/# \1/; s/^$/#/;' "$REPLY/LICENSE"; echo
+@module jqmd.md
+@comment LICENSE
 ```
 
 ## Runtime
@@ -151,17 +141,9 @@ printf -v REPLY 'mdsh:file-header() { echo -n %q; }' "$REPLY"; eval "$REPLY"
 mdsh:file-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
 ```
 
-Finally, we include the source of mdsh directly, so our compiled version won't need it installed:
+Finally, we include the source of mdsh directly, so our compiled version won't need it installed), and run the main program, if we're the main program:
 
 ```shell mdsh
-mdsh-module bashup/mdsh mdsh-source "$BASHER_PACKAGES_PATH/bashup/mdsh/mdsh.md"
-```
-
-And run the main program, if we're the main program:
-
-```shell main
-# --- All functions have been defined, main script starts here! ---
-
-# check bash-source and run main only if directly executing
-if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then mdsh-main "$@"; exit $?; fi
+@import bashup/mdsh mdsh-source "$BASHER_PACKAGES_PATH/bashup/mdsh/mdsh.md"
+@main mdsh-main
 ```
