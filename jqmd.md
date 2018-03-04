@@ -156,3 +156,12 @@ Finally, we include the source of mdsh directly, so our compiled version won't n
 ```shell mdsh
 mdsh-module bashup/mdsh mdsh-source "$BASHER_PACKAGES_PATH/bashup/mdsh/mdsh.md"
 ```
+
+And run the main program, if we're the main program:
+
+```shell main
+# --- All functions have been defined, main script starts here! ---
+
+# check bash-source and run main only if directly executing
+if [[ "$0" == "${BASH_SOURCE[0]}" ]]; then mdsh-main "$@"; exit $?; fi
+```
