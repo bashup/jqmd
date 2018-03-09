@@ -26,7 +26,7 @@ The main program begins with a `#!` line and edit warning, followed by its licen
 
 ```shell mdsh main
 @module jqmd.md
-@comment LICENSE
+@import pjeby/license @comment LICENSE
 ```
 
 ## Runtime

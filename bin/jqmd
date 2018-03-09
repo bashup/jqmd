@@ -153,7 +153,7 @@ mdsh.--eval() {
 mdsh.-E() { mdsh.--eval "$@"; }
 mdsh.--out() {
     if REPLY=("$(mdsh-main "${@:2}")"); then
-        echo "$REPLY" >"$1";
+        exec echo "$REPLY" >"$1"   # handle self-compiling properly
     else exit $?;
     fi
 }
@@ -194,16 +194,13 @@ MDSH_MODULE=
 }
 @main() {
     ! [[ $MDSH_MODULE ]] || return 0
-    MDSH_FOOTER+=$'# --- All functions have been defined, main script starts here! ---\n'
     MDSH_FOOTER+=$'if [[ $0 == "$BASH_SOURCE" ]]; then '"$1"$' "$@"; fi\n'
 }
-@comment() {
-    [[ $MDSH_MODULE ]] || (
-        ! [[ "${MDSH_SOURCE-}" == */* ]] || cd "${MDSH_SOURCE%/*}"
-        sed -e 's/^\(.\)/# \1/; s/^$/#/;' "$@"
-        echo
-    )
-}
+@comment() (  # subshell for cd
+    ! [[ "${MDSH_SOURCE-}" == */* ]] || cd "${MDSH_SOURCE%/*}"
+    sed -e 's/^\(.\)/# \1/; s/^$/#/;' "$@"
+    echo
+)
 mdsh-embed() {
     local f=$1 base=${1##*/}; local boundary="# --- EOF $base ---" contents ctr=
     [[ $f == */* && -f $f ]] || f=$(command -v "$f") || {
@@ -216,12 +213,11 @@ mdsh-embed() {
     printf $'{ if [[ $OSTYPE != cygwin && $OSTYPE != msys && -e /dev/fd/0 ]]; then source /dev/fd/0; else source <(cat); fi; } <<\'%s\'%s%s\n' "$boundary" "$contents" "$boundary"
 }
 mdsh-make() {
-    [[ -f "$2" && "$(stat -c %y "$1")" == "$(stat -c %y "$2")" ]] || (
-        "${@:3}" && mdsh-main --out "$2" --compile "$1" && touch -r "$1" "$2"
-    )
+    [[ -f "$2" && "$(stat -c %y "$1")" == "$(stat -c %y "$2")" ]] || {
+        ( "${@:3}" && mdsh-main --out "$2" --compile "$1" ) && touch -r "$1" "$2"
+    }
 }
 # run-markdown file args...
 # Compile `file` and source the result, passing along any positional arguments
 run-markdown() { source <(mdsh-source "${1--}") "${@:2}"; }
-# --- All functions have been defined, main script starts here! ---
 if [[ $0 == "$BASH_SOURCE" ]]; then mdsh-main "$@"; fi
