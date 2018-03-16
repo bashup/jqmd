@@ -94,13 +94,40 @@ RUN_JQ() {
 
 ### YAML and JSON data
 
-YAML and JSON blocks are just jq filter expressions wrapped in a call to `jqmd_data()`
+YAML and JSON blocks are just jq filter expressions wrapped in a call to `jqmd::data()` (or an appropriate alternative, selected by a `@data` directive in a mdsh block).
 
 ```bash runtime
-YAML()    { y2j "$1"; JSON "$REPLY"; }
-JSON()    { FILTER "jqmd_data($1)"; }
+jqmd_data=jqmd::data
+@data() { jqmd_data="${1-}"; }
+
+YAML()  { y2j "$1"; JSON "$REPLY"; }
+JSON()  { FILTER "$jqmd_data($1)"; }
 ```
 
+#### jqmd::data
+
+The `jqmd::data` function provides a default wrapper to convert YAML or JSON data to a jq filter.  It recursively merges dictionaries and concatenates (or appends to) arrays.
+
+```bash runtime
+DEFINE '
+def jqmd::blend($other; combine): . as $this | . *  $other | . as $combined | with_entries(
+  if (.key | in($this)) and (.key | in($other)) then
+    .this = $this[.key] | .other = $other[.key] | combine
+  else . end
+);
+
+def jqmd::combine: (.this|type) as $this | (.other|type) as $other | .value =
+  if $this == "array" then
+    if $other == "array" then .this + .other else .this + [.other] end
+  elif $this == "object" then
+    if $other == "object" then
+      .other as $o | (.this | jqmd::blend($o; jqmd::combine))
+    else .other end
+  else .other end;  # everything else just overrides
+
+def jqmd::data($data): {this: ., other:$data} | jqmd::combine | .value ;
+'
+```
 #### YAML Interpolation
 
 YAML blocks are allowed to have jq string interpolation expressions.  But since such expressions are invalid JSON, and the yaml2json filter produces only valid JSON, it's necessary to selectively *invalidate* the resulting JSON before it becomes a JQ filter.  Specifically, either one or two backslashes must be removed before every open parenthesis, depending on whether the total number of preceding backslashes is divisible by four (i.e., the original number of backslashes was divisible by two.)
@@ -120,7 +147,7 @@ y2j() {
     REPLY+=$j
 }
 ```
-### YAML to JSON Conversion (yaml2json)
+#### YAML to JSON Conversion (yaml2json)
 
 The `yaml2json` function is a wrapper that automatically selects one of `yaml2json:cmd`, `yaml2json:py`, or `yaml2json:php` to perform YAML to JSON conversions.  It does so by piping a small YAML input to each function and testing whether the result is a valid JSON conversion.
 
@@ -161,9 +188,9 @@ mdsh-compile-jq()         { printf 'FILTER  %q\n' "$1"; }
 mdsh-compile-jq_defs()    { printf 'DEFINE  %q\n' "$1"; }
 mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"; }
 
-mdsh-compile-yml()  { y2j "$1"; printf 'JSON %q\n' "$REPLY"; }
-mdsh-compile-yaml() { y2j "$1"; printf 'JSON %q\n' "$REPLY"; }
-mdsh-compile-json() { printf 'JSON %q\n' "$1"; }
+mdsh-compile-yml()  { y2j "$1"; mdsh-compile-json "$REPLY"; }
+mdsh-compile-yaml() { y2j "$1"; mdsh-compile-json "$REPLY"; }
+mdsh-compile-json() { mdsh-compile-jq "$jqmd_data($1)"; }
 
 const() {
     case "${tag_words-}" in

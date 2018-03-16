@@ -21,10 +21,6 @@ Should produce this output:
 
 Assuming that jq is run with null input and the result keys are sorted:
 
-```jq defs
-def jqmd_data($x): . + $x;
-```
-
 ```shell
 RUN_JQ -n -S
 ```

@@ -10,6 +10,7 @@
 
 - [Installation](#installation)
 - [Usage](#usage)
+  * [Data Merging](#data-merging)
 - [Programming Models](#programming-models)
   * [Filters](#filters)
   * [Scripts](#scripts)
@@ -41,13 +42,13 @@ Running `jqmd some-document.md args...` will read and interpret unindented, trip
 
 * `jq imports` -- jq module includes or imports, which are accumulated over the course of the program run, and included at the start of any executed filter pipelines (before the current set of `jq defs`).
 
-* `yaml`, `json` -- constant data, which is added to the jq filter pipeline as `jqmd_data(data)`; the effect of this depends on your definition of a `jqmd_data`  function as of the current point in the filter pipeline.  Constant blocks can also be tagged as named constants: a code block starting with e.g. `````yaml !const foo`` will have its contents defined as a zero-argument jq function named `foo`.
+* `yaml`, `json` -- YAML data or JSON expressions, which are added to the jq filter pipeline as `jqmd::data(data)`.  (Which turns the given data into a jq filter to modify an existing data structure; see [Data Merging](#data-merging), below for more details).  Data blocks can also be tagged as "named constants": a code block starting with e.g. `````yaml !const foo`` will have its contents defined as a zero-argument jq function named `foo`.
 
   That is, the following two code blocks do the exact same thing:
 
   ~~~markdown
   ​```jq defs
-  def pi: 3.14159;
+  def pi: jqmd::data(3.14159);
   ​```
   ​```json !const pi
   3.14159
@@ -79,6 +80,16 @@ As with `mdsh`, you can optionally make a markdown file directly executable by g
 Also as with `mdsh`, you can run `jqmd --compile` to output a bash version of your script, with no external dependencies (other than jq and maybe  `yaml2json` or PyYAML).  `jqmd --compile` and `jqmd --eval` both inject the necessary jqmd runtime functions into the script so that it will work on systems without jqmd installed.
 
 (If you'd like more information on compiling, sourcing, and shelldown headers, feel free to have a look at the [mdsh docs](https://github.com/bashup/mdsh)!)
+
+#### Data Merging
+
+In a jqmd program, one is often incrementally defining some sort of data structure (such as, e.g. a docker-compose project specification, or a set of Wordpress options).  While jq expressions can be used directly to manipulate such a data structure, a more intuitive way to express such data structures is as a series of JSON or YAML blocks that are combined in some way.  For this reason, jqmd defines an intuitive data structure merging function to apply such data blocks to an existing data structure.  This merging function is exposed to jqmd programs as  `jqmd::data($data)`, and a call to it is wrapped around JSON and YAML blocks by default.  The merge algorithm is as follows:
+
+* If `.` is an array, add `$data` to it (concatenating if `$data` is also an array, otherwise appending)
+* If `.` and `$data` are both objects, recursively merge their values using this same algorithm
+* In all other cases, return `$data`
+
+For most programs, this algorithm is sufficient to do most incremental data structure creation.  If you have different needs, however, you can use the `@data` directive in a `mdsh` (or `shell mdsh`) block, to specify a different jq function that will wrap `JSON` and `YAML` data.  (For example `@data foo` will use `foo(...data)` instead of `jqmd::data(...data)`.)
 
 ### Programming Models
 
@@ -156,9 +167,11 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
   This "end function-only filters with a ." rule applies whether you're using `jq`-tagged code blocks or the `FILTER` function.
 
-* `JSON`  *arg* -- a shortcut for  `FILTER "jqmd_data("`*arg*`")"`.  This function is the programmatic equivalent of including a `json` code block at the current point of execution.
+* `JSON`  *arg* -- a shortcut for  `FILTER "jqmd::data("`*arg*`")"`.  This function is the programmatic equivalent of including a `json` code block at the current point of execution.
 
-* `YAML` *arg* -- a shortcut for  `FILTER "jqmd_data("`*arg-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, the system default `python` has PyYAML installed, or the system default `php` has the YAML extension installed.)
+* `YAML` *arg* -- a shortcut for  `FILTER "jqmd::data("`*arg-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, the system default `python` has PyYAML installed, or the system default `php` has the YAML extension installed.)
+
+* `@data` *jq-funcname* -- change the default data wrapper function from `jqmd::data` to *jq-funcname*.  If used in a `mdsh` or `shell mdsh` block, it changes this for `yaml` and `json` blocks; if used in a regular `shell` block, it changes the data wrapper used by the `YAML` and `JSON` functions.
 
 * `yaml2json` -- a filter that takes YAML or JSON input, and produces JSON output.  The actual implementation is system-dependent, using either a `yam2json` command line tool, Python, or PHP, depending on what's available.  This can be used to convert data, validate it, or to remove jq expressions from untrusted input.
 

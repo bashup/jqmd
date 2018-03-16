@@ -23,7 +23,8 @@ mdsh_raw_bash_runtime+=($'#!/usr/bin/env bash\n\n# --- BEGIN jqmd runtime ---\n'
 mdsh_raw_bash_runtime+=($'jqmd_imports=\njqmd_filters=\njqmd_defines=\n\nHAVE_FILTERS() { [[ ${jqmd_filters-} ]]; }\nCLEAR_FILTERS() { unset jqmd_filters; }\n\nIMPORTS() { jqmd_imports+="${jqmd_imports:+$\'\\n\'}$1"; }\nDEFINE()  { jqmd_defines+="${jqmd_defines:+$\'\\n\'}$1"; }\nFILTER()  { jqmd_filters+="${jqmd_filters:+|}$1"; }\n')
 mdsh_raw_bash_runtime+=($'JQOPTS=(jq)\nJQ_OPTS() { JQOPTS+=("$@"); }\nARG()     { JQ_OPTS --arg     "$1" "$2"; }\nARGJSON() { JQ_OPTS --argjson "$1" "$2"; }\n')
 mdsh_raw_bash_runtime+=($'RUN_JQ() {\n    local opt nargs cmd=(jq); set -- "${JQOPTS[@]:1}" "$@"\n\n    while (($#)); do\n        case "$1" in\n        -{f,-fromfile})                     nargs=2 ; FILTER "$(<"$2")" ;;\n        -{L,-indent})                       nargs=2 ;;\n        --{arg,arjgson,slurpfile,argfile})  nargs=3 ;;\n        --)  break   ;; # rest of args are data files\n        -*)  nargs=1 ;;\n        *)   FILTER "$1"; break ;; # jq program: data files follow\n        esac\n        cmd+=("${@:1:$nargs}")    # add $nargs args to cmd\n        shift $nargs\n    done\n\n    HAVE_FILTERS || FILTER .    # jq needs at least one filter expression\n\n    "${cmd[@]}" -f <(\n        printf "%s\\n" "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"\n    ) "${@:2}"\n\n    CLEAR_FILTERS   # cleanup for any re-runs\n}\n')
-mdsh_raw_bash_runtime+=($'YAML()    { y2j "$1"; JSON "$REPLY"; }\nJSON()    { FILTER "jqmd_data($1)"; }\n')
+mdsh_raw_bash_runtime+=($'jqmd_data=jqmd::data\n@data() { jqmd_data="${1-}"; }\n\nYAML()  { y2j "$1"; JSON "$REPLY"; }\nJSON()  { FILTER "$jqmd_data($1)"; }\n')
+mdsh_raw_bash_runtime+=($'DEFINE \'\ndef jqmd::blend($other; combine): . as $this | . *  $other | . as $combined | with_entries(\n  if (.key | in($this)) and (.key | in($other)) then\n    .this = $this[.key] | .other = $other[.key] | combine\n  else . end\n);\n\ndef jqmd::combine: (.this|type) as $this | (.other|type) as $other | .value =\n  if $this == "array" then\n    if $other == "array" then .this + .other else .this + [.other] end\n  elif $this == "object" then\n    if $other == "object" then\n      .other as $o | (.this | jqmd::blend($o; jqmd::combine))\n    else .other end\n  else .other end;  # everything else just overrides\n\ndef jqmd::data($data): {this: ., other:$data} | jqmd::combine | .value ;\n\'\n')
 mdsh_raw_bash_runtime+=($'y2j() {\n    local p j="$(echo "$1" | yaml2json)"; REPLY=\n    while [[ $j == *\'\\\\(\'* ]]; do\n        p=${j%%\'\\\\(\'*}; j=${j#"$p"\'\\\\(\'}\n        if [[ $p =~ (^|[^\\\\])(\'\\\\\\\\\')*$ ]]; then\n            p="${p}"\'\\(\' # odd, unbalance the backslash\n        else\n            p="${p}("   # even, remove one actual backslash\n        fi\n        REPLY+=$p\n    done\n    REPLY+=$j\n}\n')
 mdsh_raw_bash_runtime+=($'yaml2json:cmd() { command yaml2json /dev/stdin; }\n\nyaml2json:py() {\n    python -c \'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)\'\n}\n\nyaml2json:php() {\n    php -r \'echo json_encode( yaml_parse(file_get_contents("php://stdin")) );\'\n}\n\nyaml2json() {\n    local kind  # auto-select between available yaml2json implementations\n    for kind in cmd py php; do\n        REPLY=($(yaml2json:$kind < <(echo "a: b") 2>/dev/null || true))\n        printf -v REPLY %s ${REPLY+"${REPLY[@]}"}\n        if [[ "$REPLY" == \'{"a":"b"}\' ]]; then\n            eval "yaml2json() { yaml2json:$kind; }"; yaml2json; return\n        fi\n    done\n    mdsh-error "To process YAML, must have one of: yaml2json, PyYAML, or php w/yaml extension"\n    exit 69 # EX_UNAVAILABLE\n}\n\n# --- END jqmd runtime ---\n')
 # Language Support
@@ -31,9 +32,9 @@ mdsh-compile-jq()         { printf 'FILTER  %q\n' "$1"; }
 mdsh-compile-jq_defs()    { printf 'DEFINE  %q\n' "$1"; }
 mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"; }
 
-mdsh-compile-yml()  { y2j "$1"; printf 'JSON %q\n' "$REPLY"; }
-mdsh-compile-yaml() { y2j "$1"; printf 'JSON %q\n' "$REPLY"; }
-mdsh-compile-json() { printf 'JSON %q\n' "$1"; }
+mdsh-compile-yml()  { y2j "$1"; mdsh-compile-json "$REPLY"; }
+mdsh-compile-yaml() { y2j "$1"; mdsh-compile-json "$REPLY"; }
+mdsh-compile-json() { mdsh-compile-jq "$jqmd_data($1)"; }
 
 const() {
     case "${tag_words-}" in
