@@ -98,8 +98,27 @@ RUN_JQ() {
 YAML()    { JSON "$(echo "$1" | yaml2json /dev/stdin)"; }
 JSON()    { FILTER "jqmd_data($1)"; }
 
-command -v yaml2json >/dev/null || yaml2json() {
-    python -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout, indent=4)';
+yaml2json:cmd() { command yaml2json /dev/stdin; }
+
+yaml2json:py() {
+    python -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)'
+}
+
+yaml2json:php() {
+    php -r 'echo json_encode( yaml_parse(file_get_contents("php://stdin")) );'
+}
+
+yaml2json() {
+    local kind  # auto-select between available yaml2json implementations
+    for kind in cmd py php; do
+        REPLY=($(yaml2json:$kind < <(echo "a: b") 2>/dev/null))
+        printf -v REPLY %s ${REPLY+"${REPLY[@]}"}
+        if [[ "$REPLY" == '{"a":"b"}' ]]; then
+            eval "yaml2json() { yaml2json:$kind; }"; yaml2json; return
+        fi
+    done
+    mdsh-error "To process YAML, must have one of: yaml2json, PyYAML, or php w/yaml extension"
+    exit 69 # EX_UNAVAILABLE
 }
 
 # --- END jqmd runtime ---
