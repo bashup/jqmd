@@ -8,14 +8,14 @@
     > { "x": "y" }
     > ```
     > ```yaml ! const foo
-    > a: b
+    > a: \(env.FOO) - b
     > ```
     > ```shell
     > JQ_OPTS -n '. + foo'
     > ```
     > -
-    $ $TESTDIR/../jqmd.md test.md
+    $ FOO=bar $TESTDIR/../jqmd.md test.md
     {
       "x": "y",
-      "a": "b"
+      "a": "bar - b"
     }

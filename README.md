@@ -54,7 +54,11 @@ Running `jqmd some-document.md args...` will read and interpret unindented, trip
   ​```
   ~~~
 
-  (Note: YAML data can only be processed if there is a `yaml2json` executable on `PATH`, the  system `python` interpreter has PyYAML installed, or PHP with the YAML extension from PECL; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as the process startup time alone is considerably smaller than that of Python or PHP.)
+  (Note: YAML data can only be processed if there is a `yaml2json` executable on `PATH`, the system `python` interpreter has PyYAML installed, or PHP has the YAML extension from PECL; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as its process startup time alone is considerably smaller than that of Python or PHP.)
+
+  Both YAML and JSON blocks can contain **jq string interpolation expressions**, denoted by ``\( )``.  For example, a JSON block containing ``{ "foo": "\(env.BAR)"}`` will cause jq to insert the contents of the environment variable `BAR` into the data structure at the appropriate point.  (Note that this means that if you have a backslash before a `(` in your YAML blocks and you *don't* want it to be treated as interpolation, you will need to add an extra backslash in front of it.)
+
+  (In addition, `json` blocks do not have to be valid JSON: they can actually contain arbitrary jq expressions.  The only real difference between a `json` block and a `jq` block is that it's automatically wrapped in a call to `jqmd_data()`.)
 
 (As with `mdsh`, you can extend the above list by defining appropriate hook functions in `mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
 
@@ -156,7 +160,11 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 * `YAML` *arg* -- a shortcut for  `FILTER "jqmd_data("`*arg-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, the system default `python` has PyYAML installed, or the system default `php` has the YAML extension installed.)
 
+* `yaml2json` -- a filter that takes YAML or JSON input, and produces JSON output.  The actual implementation is system-dependent, using either a `yam2json` command line tool, Python, or PHP, depending on what's available.  This can be used to convert data, validate it, or to remove jq expressions from untrusted input.
+
 Notice that JSON and YAML data are always filtered through a `jqmd_data()` function, which *your script must define*.  You are not required to keep this function the same, at all times, however.  You can redefine it at various points in your pipeline if you need to handle it.  (Just remember that within each filter block, you can begin with function definitions but *must* end with an expression, even if it's only a `.`.)
+
+Also note that data passed to the `JSON` and `YAML` functions *can contain jq interpolation expressions*, which means that you **must not pass untrusted data to them**.  You can validate and/or neutralize the data by piping it through the `yaml2json` function before calling `JSON` on it.
 
 #### Adding jq Options and Arguments
 

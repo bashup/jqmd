@@ -94,10 +94,37 @@ RUN_JQ() {
 
 ### YAML and JSON data
 
-```bash runtime
-YAML()    { JSON "$(echo "$1" | yaml2json /dev/stdin)"; }
-JSON()    { FILTER "jqmd_data($1)"; }
+YAML and JSON blocks are just jq filter expressions wrapped in a call to `jqmd_data()`
 
+```bash runtime
+YAML()    { y2j "$1"; JSON "$REPLY"; }
+JSON()    { FILTER "jqmd_data($1)"; }
+```
+
+#### YAML Interpolation
+
+YAML blocks are allowed to have jq string interpolation expressions.  But since such expressions are invalid JSON, and the yaml2json filter produces only valid JSON, it's necessary to selectively *invalidate* the resulting JSON before it becomes a JQ filter.  Specifically, either one or two backslashes must be removed before every open parenthesis, depending on whether the total number of preceding backslashes is divisible by four (i.e., the original number of backslashes was divisible by two.)
+
+```bash runtime
+y2j() {
+    local p j="$(echo "$1" | yaml2json)"; REPLY=
+    while [[ $j == *'\\('* ]]; do
+        p=${j%%'\\('*}; j=${j#"$p"'\\('}
+        if [[ $p =~ (^|[^\\])('\\\\')*$ ]]; then
+            p="${p}"'\(' # odd, unbalance the backslash
+        else
+            p="${p}("   # even, remove one actual backslash
+        fi
+        REPLY+=$p
+    done
+    REPLY+=$j
+}
+```
+### YAML to JSON Conversion (yaml2json)
+
+The `yaml2json` function is a wrapper that automatically selects one of `yaml2json:cmd`, `yaml2json:py`, or `yaml2json:php` to perform YAML to JSON conversions.  It does so by piping a small YAML input to each function and testing whether the result is a valid JSON conversion.
+
+```bash runtime
 yaml2json:cmd() { command yaml2json /dev/stdin; }
 
 yaml2json:py() {
@@ -111,7 +138,7 @@ yaml2json:php() {
 yaml2json() {
     local kind  # auto-select between available yaml2json implementations
     for kind in cmd py php; do
-        REPLY=($(yaml2json:$kind < <(echo "a: b") 2>/dev/null))
+        REPLY=($(yaml2json:$kind < <(echo "a: b") 2>/dev/null || true))
         printf -v REPLY %s ${REPLY+"${REPLY[@]}"}
         if [[ "$REPLY" == '{"a":"b"}' ]]; then
             eval "yaml2json() { yaml2json:$kind; }"; yaml2json; return
@@ -134,13 +161,13 @@ mdsh-compile-jq()         { printf 'FILTER  %q\n' "$1"; }
 mdsh-compile-jq_defs()    { printf 'DEFINE  %q\n' "$1"; }
 mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"; }
 
-mdsh-compile-yml()  { printf 'JSON %q\n' "$(echo "$1" | yaml2json /dev/stdin)"; }
-mdsh-compile-yaml() { printf 'JSON %q\n' "$(echo "$1" | yaml2json /dev/stdin)"; }
+mdsh-compile-yml()  { y2j "$1"; printf 'JSON %q\n' "$REPLY"; }
+mdsh-compile-yaml() { y2j "$1"; printf 'JSON %q\n' "$REPLY"; }
 mdsh-compile-json() { printf 'JSON %q\n' "$1"; }
 
 const() {
     case "${tag_words-}" in
-    yaml|yml) printf "DEFINE %q\n" "def $1: $(echo "$block"|yaml2json /dev/stdin) ;" ;;
+    yaml|yml) y2j "$block"; printf "DEFINE %q\n" "def $1: $REPLY ;" ;;
     json)     printf "DEFINE %q\n" "def $1: $block ;" ;;
     *) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
     esac
