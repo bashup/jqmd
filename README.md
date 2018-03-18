@@ -55,7 +55,7 @@ Running `jqmd some-document.md args...` will read and interpret unindented, trip
   ​```
   ~~~
 
-  (Note: YAML data can only be processed if there is a `yaml2json` executable on `PATH`, the system `python` interpreter has PyYAML installed, or PHP has the YAML extension from PECL; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as its process startup time alone is considerably smaller than that of Python or PHP.)
+  (Note: YAML data can only be processed if there is a `yaml2json` executable on `PATH`, the system `python` interpreter has PyYAML installed, or [yaml2json.php](https://packagist.org/packages/dirtsimple/yaml2json) is installed; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as its process startup time alone is considerably smaller than that of Python or PHP.)
 
   Both YAML and JSON blocks can contain **jq string interpolation expressions**, denoted by ``\( )``.  For example, a JSON block containing ``{ "foo": "\(env.BAR)"}`` will cause jq to insert the contents of the environment variable `BAR` into the data structure at the appropriate point.  (Note that this means that if you have a backslash before a `(` in your YAML blocks and you *don't* want it to be treated as interpolation, you will need to add an extra backslash in front of it.)
 
@@ -77,7 +77,7 @@ As with `mdsh`, you can optionally make a markdown file directly executable by g
 ...markdown and code start here...
 ~~~
 
-Also as with `mdsh`, you can run `jqmd --compile` to output a bash version of your script, with no external dependencies (other than jq and maybe  `yaml2json` or PyYAML).  `jqmd --compile` and `jqmd --eval` both inject the necessary jqmd runtime functions into the script so that it will work on systems without jqmd installed.
+Also as with `mdsh`, you can run `jqmd --compile` to output a bash version of your script, with no external dependencies (other than jq and maybe  `yaml2json` or PyYAML).  `jqmd --compile` and `jqmd --eval` both inject the necessary jqmd runtime functions into the script so that it will work on systems without jqmd installed.  (Note that unless your script uses the `YAML` or `yaml2json` functions at *runtime*, your script's users will not need it installed.)
 
 (If you'd like more information on compiling, sourcing, and shelldown headers, feel free to have a look at the [mdsh docs](https://github.com/bashup/mdsh)!)
 
@@ -169,7 +169,7 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 * `JSON`  *arg* -- a shortcut for  `FILTER "jqmd::data("`*arg*`")"`.  This function is the programmatic equivalent of including a `json` code block at the current point of execution.
 
-* `YAML` *arg* -- a shortcut for  `FILTER "jqmd::data("`*arg-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, the system default `python` has PyYAML installed, or the system default `php` has the YAML extension installed.)
+* `YAML` *arg* -- a shortcut for  `FILTER "jqmd::data("`*arg-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, the system default `python` has PyYAML installed, or [yaml2json.php](https://packagist.org/packages/dirtsimple/yaml2json) is on the system `PATH`.)
 
 * `@data` *jq-funcname* -- change the default data wrapper function from `jqmd::data` to *jq-funcname*.  If used in a `mdsh` or `shell mdsh` block, it changes this for `yaml` and `json` blocks; if used in a regular `shell` block, it changes the data wrapper used by the `YAML` and `JSON` functions.
 

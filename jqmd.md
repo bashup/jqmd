@@ -134,7 +134,7 @@ YAML blocks are allowed to have jq string interpolation expressions.  But since 
 
 ```bash runtime
 y2j() {
-    local p j="$(echo "$1" | yaml2json)"; REPLY=
+    local p j="$(echo "$1" | yaml2json)" || return $?; REPLY=
     while [[ $j == *'\\('* ]]; do
         p=${j%%'\\('*}; j=${j#"$p"'\\('}
         if [[ $p =~ (^|[^\\])('\\\\')*$ ]]; then
@@ -158,16 +158,14 @@ yaml2json:py() {
     python -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)'
 }
 
-yaml2json:php() {
-    php -r 'echo json_encode( yaml_parse(file_get_contents("php://stdin")) );'
-}
+yaml2json:php() { command yaml2json.php; }
 
 yaml2json() {
     local kind  # auto-select between available yaml2json implementations
     for kind in cmd py php; do
-        REPLY=($(yaml2json:$kind < <(echo "a: b") 2>/dev/null || true))
+        REPLY=($(yaml2json:$kind < <(echo "a: {}") 2>/dev/null || true))
         printf -v REPLY %s ${REPLY+"${REPLY[@]}"}
-        if [[ "$REPLY" == '{"a":"b"}' ]]; then
+        if [[ "$REPLY" == '{"a":{}}' ]]; then
             eval "yaml2json() { yaml2json:$kind; }"; yaml2json; return
         fi
     done
