@@ -67,8 +67,9 @@ mdsh-parse() {
 	done
 }
 mdsh-source() {
-	local MDSH_FOOTER=
+	local MDSH_FOOTER= MDSH_SOURCE
 	if [[ ${1:--} != '-' ]]; then
+		MDSH_SOURCE="$1"
 		mdsh-parse __COMPILE__ <"$1"
 	else mdsh-parse __COMPILE__
 	fi
@@ -142,7 +143,7 @@ function mdsh-interpret() {
 mdsh.--compile() {
 	(($#)) || mdsh-error "Usage: %s --compile FILENAME..." "${0##*/}"
 	! fn-exists mdsh:file-header || mdsh:file-header
-	for REPLY; do MDSH_SOURCE=$REPLY mdsh-compile "$REPLY"; done
+	for REPLY; do mdsh-compile "$REPLY"; done
 	! fn-exists mdsh:file-footer || mdsh:file-footer
 }
 
@@ -230,7 +231,7 @@ mdsh-make() {
 }
 mdsh-cache() {
 	[[ -d "$1" ]] || mkdir -p "$1"
-	flatname "${3:-$2}"; mdsh-make "$2" "$1/$REPLY" "${@:4}"
+	flatname "${3:-$2}"; REPLY="$1/$REPLY"; mdsh-make "$2" "$REPLY" "${@:4}"
 }
 
 flatname() {
@@ -239,5 +240,10 @@ flatname() {
 }
 # run-markdown file args...
 # Compile `file` and source the result, passing along any positional arguments
-run-markdown() { source <(mdsh-source "${1--}") "${@:2}"; }
+run-markdown() {
+	if [[ $BASH_VERSINFO == 3 ]]; then # bash 3 can't source from proc
+		source /dev/fd/0 "${@:2}" <<<"$(mdsh-source "${1--}")"
+	else source <(mdsh-source "${1--}") "${@:2}"
+	fi
+}
 if [[ $0 == "$BASH_SOURCE" ]]; then mdsh-main "$@"; fi
