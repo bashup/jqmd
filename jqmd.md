@@ -211,7 +211,21 @@ printf -v REPLY '%s\n' "${mdsh_raw_bash_runtime[@]}"; eval "$REPLY"
 printf -v REPLY 'mdsh:file-header() { echo -n %q; }' "$REPLY"; eval "$REPLY"
 
 # Ensure scripts process any leftover filters at end
-mdsh:file-footer() { echo 'if [[ $0 == $BASH_SOURCE ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
+mdsh:file-footer() { echo 'if [[ $0 == ${BASH_SOURCE-} ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
+```
+
+It also defines a few command line options for controlling compilation:
+
+```shell
+mdsh.--no-runtime() ( unset -f mdsh:file-header mdsh:file-footer; mdsh-main "$@"; )
+mdsh.--yaml() (
+    fn-exists "yaml2json:${1-}" || mdsh-error "No such yaml2json processor: ${1-}" || exit $?
+    eval 'yaml2json() { yaml2json:'"$1"'; }'
+    mdsh-main "${@:2}"
+)
+
+mdsh.-R() { mdsh.--no-runtime "$@"; }
+mdsh.-y() { mdsh.--yaml "$@"; }
 ```
 
 Finally, we include the source of mdsh directly, so our compiled version won't need it installed), and run the main program, if we're the main program:
