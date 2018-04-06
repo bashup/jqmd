@@ -24,9 +24,12 @@ jqmd is an mdsh extension written as a literate program using mdsh.  Within this
 
 The main program begins with a `#!` line and edit warning, followed by its license text::
 
-```shell mdsh main
+```shell mdsh
 @module jqmd.md
-@import pjeby/license @comment LICENSE
+@main mdsh-main
+
+@require pjeby/license @comment LICENSE
+@require bashup/mdsh   mdsh-source "$BASHER_PACKAGES_PATH/bashup/mdsh/mdsh.md"
 ```
 
 ## Runtime
@@ -226,9 +229,4 @@ mdsh.-R() { mdsh.--no-runtime "$@"; }
 mdsh.-y() { mdsh.--yaml "$@"; }
 ```
 
-Finally, we include the source of mdsh directly, so our compiled version won't need it installed), and run the main program, if we're the main program:
 
-```shell mdsh
-@import bashup/mdsh mdsh-source "$BASHER_PACKAGES_PATH/bashup/mdsh/mdsh.md"
-@main mdsh-main
-```
