@@ -22,7 +22,7 @@ jqmd is an mdsh extension written as a literate program using mdsh.  Within this
 
 ## File Header
 
-The main program begins with a `#!` line and edit warning, followed by its license text::
+The main program begins with a `#!` line and edit warning, followed by its license text, and the source of mdsh:
 
 ```shell mdsh
 @module jqmd.md
@@ -208,11 +208,11 @@ It also evals the runtime, and defines header/footer hooks to embed the runtime 
 # Load the runtime so it's usable by mdsh
 printf -v REPLY '%s\n' "${mdsh_raw_bash_runtime[@]}"; eval "$REPLY"
 
-# Add runtime to the top of compiled scripts
-printf -v REPLY 'mdsh:file-header() { echo -n %q; }' "$REPLY"; eval "$REPLY"
+# Add runtime to the top of compiled (main) scripts
+printf -v REPLY 'mdsh:file-header() { ! @is-main || echo -n %q; }' "$REPLY"; eval "$REPLY"
 
-# Ensure scripts process any leftover filters at end
-mdsh:file-footer() { echo 'if [[ $0 == ${BASH_SOURCE-} ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
+# Ensure (main) scripts process any leftover filters at end
+mdsh:file-footer() { ! @is-main || echo 'if [[ $0 == ${BASH_SOURCE-} ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
 ```
 
 It also defines a few command line options for controlling compilation:

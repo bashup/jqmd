@@ -76,10 +76,10 @@ mdsh-misc()          { mdsh-data "$@"; }    # Treat unknown languages as data
 mdsh-compile-()      { :; }                 # Ignore language-less blocks
 
 mdsh-compile-mdsh()  { eval "$1"; }         # Execute `mdsh` blocks in-line
-mdsh-compile-mdsh_main() { [[ $MDSH_MODULE ]] || eval "$1"; }
+mdsh-compile-mdsh_main() { ! @is-main || eval "$1"; }
 
 mdsh-compile-shell() { printf '%s' "$1"; }  # Copy `shell` blocks to the output
-mdsh-compile-shell_main() { [[ $MDSH_MODULE ]] || printf '%s' "$1"; }
+mdsh-compile-shell_main() { ! @is-main || printf '%s' "$1"; }
 mdsh-data() {
 	printf "mdsh_raw_${1//[^_[:alnum:]]/_}+=(%q)\n" "$2"
 }
@@ -150,15 +150,16 @@ mdsh.-h() { mdsh.--help "$@"; }
 MDSH_LOADED_MODULES=
 MDSH_MODULE=
 
-@import() { @require "$@"; }
 @require() {
-	if ! [[ $MDSH_LOADED_MODULES == *"<$1>"* ]]; then
-		MDSH_LOADED_MODULES+="<$1>"; local MDSH_MODULE=$1
+	flatname "$1"
+	if ! [[ $MDSH_LOADED_MODULES == *"<$REPLY>"* ]]; then
+		MDSH_LOADED_MODULES+="<$REPLY>"; local MDSH_MODULE=$1
 		"${@:2}"
 	fi
 }
+@is-main() { ! [[ $MDSH_MODULE ]]; }
 @module() {
-	! [[ $MDSH_MODULE ]] || return 0
+	@is-main || return 0
 	set -- "${1:-${MDSH_SOURCE-}}"
 	echo "#!/usr/bin/env bash"
 	echo "# ---"
@@ -167,7 +168,7 @@ MDSH_MODULE=
 	echo
 }
 @main() {
-	! [[ $MDSH_MODULE ]] || return 0
+	@is-main || return 0
 	MDSH_FOOTER=$'if [[ $0 == "${BASH_SOURCE-}" ]]; then '"$1"$' "$@"; fi\n'
 }
 @comment() (  # subshell for cd
@@ -202,9 +203,9 @@ mdsh-cache() {
 	[[ -d "$1" ]] || mkdir -p "$1"
 	flatname "${3:-$2}"; REPLY="$1/$REPLY"; mdsh-make "$2" "$REPLY" "${@:4}"
 }
-
 flatname() {
 	REPLY="${1//\%/%25}"; REPLY="${REPLY//\//%2F}"; REPLY="${REPLY/#./%2E}"
+	REPLY="${REPLY//</%3C}"; REPLY="${REPLY//>/%3E}"
 	REPLY="${REPLY//\\/%5C}"
 }
 # run-markdown file args...
@@ -242,11 +243,11 @@ const() {
 # Load the runtime so it's usable by mdsh
 printf -v REPLY '%s\n' "${mdsh_raw_bash_runtime[@]}"; eval "$REPLY"
 
-# Add runtime to the top of compiled scripts
-printf -v REPLY 'mdsh:file-header() { echo -n %q; }' "$REPLY"; eval "$REPLY"
+# Add runtime to the top of compiled (main) scripts
+printf -v REPLY 'mdsh:file-header() { ! @is-main || echo -n %q; }' "$REPLY"; eval "$REPLY"
 
-# Ensure scripts process any leftover filters at end
-mdsh:file-footer() { echo 'if [[ $0 == ${BASH_SOURCE-} ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
+# Ensure (main) scripts process any leftover filters at end
+mdsh:file-footer() { ! @is-main || echo 'if [[ $0 == ${BASH_SOURCE-} ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
 mdsh.--no-runtime() ( unset -f mdsh:file-header mdsh:file-footer; mdsh-main "$@"; )
 mdsh.--yaml() (
     fn-exists "yaml2json:${1-}" || mdsh-error "No such yaml2json processor: ${1-}" || exit $?
