@@ -172,7 +172,7 @@ yaml2json() {
             eval "yaml2json() { yaml2json:$kind; }"; yaml2json; return
         fi
     done
-    mdsh-error "To process YAML, must have one of: yaml2json, PyYAML, or php w/yaml extension"
+    mdsh-error "To process YAML, must have one of: yaml2json, PyYAML, or yaml2json.php"
     exit 69 # EX_UNAVAILABLE
 }
 
