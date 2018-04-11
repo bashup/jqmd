@@ -185,8 +185,8 @@ The non-runtime part of the program defines hooks for mdsh to be able to compile
 
 ```shell
 # Language Support
-mdsh-compile-jq()         { printf 'FILTER  %q\n' "$1"; }
-mdsh-compile-jq_defs()    { printf 'DEFINE  %q\n' "$1"; }
+mdsh-compile-jq()         { printf 'FILTER %q\n' "$1"; }
+mdsh-compile-jq_defs()    { printf 'DEFINE %q\n' "$1"; }
 mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"; }
 
 mdsh-compile-yml()  { y2j "$1"; mdsh-compile-json "$REPLY"; }
