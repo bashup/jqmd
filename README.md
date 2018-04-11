@@ -59,7 +59,7 @@ Running `jqmd some-document.md args...` will read and interpret unindented, trip
 
   Both YAML and JSON blocks can contain **jq string interpolation expressions**, denoted by ``\( )``.  For example, a JSON block containing ``{ "foo": "\(env.BAR)"}`` will cause jq to insert the contents of the environment variable `BAR` into the data structure at the appropriate point.  (Note that this means that if you have a backslash before a `(` in your YAML blocks and you *don't* want it to be treated as interpolation, you will need to add an extra backslash in front of it.)
 
-  (In addition, `json` blocks do not have to be valid JSON: they can actually contain arbitrary jq expressions.  The only real difference between a `json` block and a `jq` block is that it's automatically wrapped in a call to `jqmd_data()`.)
+  (In addition, `json` blocks do not have to be valid JSON: they can actually contain arbitrary jq expressions.  The only real difference between a `json` block and a `jq` block is that it's automatically wrapped in a call to `jqmd::data()`.)
 
 (As with `mdsh`, you can extend the above list by defining appropriate hook functions in `mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
 
@@ -127,7 +127,7 @@ def recursive_add($other): . as $original |
         (. // {}) * $other; setpath( $path; ($original | getpath($path)) + ($other | getpath($path)) )
     );
 '
-DEFINE 'def jqmd_data($arg): recursive_add($arg);'
+DEFINE 'def jqmd::data($arg): recursive_add($arg);'
 ```
 
 #### Adding jq Code and Data
@@ -152,7 +152,7 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 * `FILTER` *arg* -- add the given jq expression to the jq filter pipeline.  The expression is automatically prefixed with `|` if any filter expressions have already been added to the pipeline.  (This function is the programmatic equivalent of including a `jq` code block at the current point of execution.)
 
-  Every `jq`-tagged code block or `FILTER` argument **must** contain a jq expression.  Since jq expressions can begin with function definitions, this means that you can begin a filter with function definitions.  This can be useful for redefining `jqmd_data` or other functions at various points within your filter pipeline, or to define functions that will only be used for one `RUN_JQ` pipeline.
+  Every `jq`-tagged code block or `FILTER` argument **must** contain a jq expression.  Since jq expressions can begin with function definitions, this means that you can begin a filter with function definitions.  This can be useful for redefining `jqmd::data` or other functions at various points within your filter pipeline, or to define functions that will only be used for one `RUN_JQ` pipeline.
 
   Bear in mind, however, that because a filter block *must* contain a valid jq expression, you may need to terminate your filter with a `.` if it contains only functions.  For example, this bit of `jq` code is a valid filter, because it ends with a `.`:
 
@@ -175,9 +175,9 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 * `yaml2json` -- a filter that takes YAML or JSON input, and produces JSON output.  The actual implementation is system-dependent, using either a `yam2json` command line tool, Python, or PHP, depending on what's available.  This can be used to convert data, validate it, or to remove jq expressions from untrusted input.
 
-Notice that JSON and YAML data are always filtered through a `jqmd_data()` function, which *your script must define*.  You are not required to keep this function the same, at all times, however.  You can redefine it at various points in your pipeline if you need to handle it.  (Just remember that within each filter block, you can begin with function definitions but *must* end with an expression, even if it's only a `.`.)
+Notice that JSON and YAML blocks are always filtered through a `jqmd::data()` function, or the function specified by the last `@data` directive.  (Just remember that within each filter block, you can begin with function definitions but *must* end with an expression, even if it's only a `.`.)
 
-Also note that data passed to the `JSON` and `YAML` functions *can contain jq interpolation expressions*, which means that you **must not pass untrusted data to them**.  You can validate and/or neutralize the data by piping it through the `yaml2json` function before calling `JSON` on it.
+Also note that data passed to the `JSON` and `YAML` functions *can contain jq interpolation expressions*, which means that you **must not pass untrusted data to them**.  You can validate and/or neutralize such data by piping it through the `yaml2json` function before calling `JSON` on it.
 
 #### Adding jq Options and Arguments
 
