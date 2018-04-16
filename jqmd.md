@@ -50,7 +50,7 @@ jqmd_filters=
 jqmd_defines=
 
 HAVE_FILTERS() { [[ ${jqmd_filters-} ]]; }
-CLEAR_FILTERS() { unset jqmd_filters; }
+CLEAR_FILTERS() { unset jqmd_filters; JQ_OPTS=(jq); }
 
 IMPORTS() { jqmd_imports+="${jqmd_imports:+$'\n'}$1"; }
 DEFINE()  { jqmd_defines+="${jqmd_defines:+$'\n'}$1"; }
@@ -60,8 +60,8 @@ FILTER()  { jqmd_filters+="${jqmd_filters:+|}$1"; }
 ### jq options and arguments
 
 ```bash runtime
-JQOPTS=(jq)
-JQ_OPTS() { JQOPTS+=("$@"); }
+JQ_OPTS=(jq)
+JQ_OPTS() { JQ_OPTS+=("$@"); }
 ARG()     { JQ_OPTS --arg     "$1" "$2"; }
 ARGJSON() { JQ_OPTS --argjson "$1" "$2"; }
 ```
@@ -69,14 +69,17 @@ ARGJSON() { JQ_OPTS --argjson "$1" "$2"; }
 ### Invoking jq
 
 ```bash runtime
-RUN_JQ() {
-    local opt nargs cmd=(jq); set -- "${JQOPTS[@]:1}" "$@"
+JQ_CMD() {
+    local f= opt nargs cmd=(jq); set -- "${JQ_OPTS[@]:1}" "$@"
 
     while (($#)); do
         case "$1" in
-        -{f,-fromfile})                     nargs=2 ; FILTER "$(<"$2")" ;;
-        -{L,-indent})                       nargs=2 ;;
-        --{arg,arjgson,slurpfile,argfile})  nargs=3 ;;
+        -f|--fromfile)
+             opt=$(<"$2") || return 69
+             FILTER "$opt"; shift 2; continue
+             ;;
+        -L|--indent)                            nargs=2 ;;
+        --arg|--arjgson|--slurpfile|--argfile)  nargs=3 ;;
         --)  break   ;; # rest of args are data files
         -*)  nargs=1 ;;
         *)   FILTER "$1"; break ;; # jq program: data files follow
@@ -86,13 +89,16 @@ RUN_JQ() {
     done
 
     HAVE_FILTERS || FILTER .    # jq needs at least one filter expression
+    for REPLY in "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"; do
+        [[ $REPLY ]] && f+=${f:+$'\n'}$REPLY
+    done
 
-    "${cmd[@]}" -f <(
-        printf "%s\n" "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"
-    ) "${@:2}"
-
+    REPLY=("${cmd[@]}" "$f" "${@:2}")
     CLEAR_FILTERS   # cleanup for any re-runs
 }
+
+RUN_JQ() { JQ_CMD "$@" && "${REPLY[@]}"; }
+CALL_JQ() { JQ_CMD "$@" && REPLY=("$("${REPLY[@]}")"); }
 ```
 
 ### YAML and JSON data

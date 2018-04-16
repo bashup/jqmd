@@ -181,10 +181,12 @@ Also note that data passed to the `JSON` and `YAML` functions *can contain jq in
 
 #### Adding jq Options and Arguments
 
-* `JQ_OPTS` *opts...* -- add *opts* to the jq command line being built up.  Whenever jq is run (either explicitly using `RUN_JQ`, or implicitly at the end of the document), the given options will be part of the command line.
+* `JQ_OPTS` *opts...* -- add *opts* to the jq command line being built up.  Whenever jq is run (either explicitly using `RUN_JQ` or `CALL_JQ`, or implicitly at the end of the document), the given options will be part of the command line.
 * `ARG` *name value* -- define a jq variable named `$`*name*, with the supplied string value.  (Shortcut for  `JQ_OPTS --arg name value`.)
 * `ARGJSON` *name json-value* -- define a jq variable named `$`*name*, with the supplied JSON value.  (Shortcut for `JQ_OPTS --argjson name json`.)  This is especially useful for passing the output of other programs or data files as arguments to your jq code, e.g. `ARGJSON something "$(wp option get something --format=json)"`.
 
+
+(Note: the added options will reset to empty again after `RUN_JQ`, `CALL_JQ`, or `CLEAR_FILTERS`.)
 
 #### Controlling jq Execution
 
@@ -192,9 +194,21 @@ Also note that data passed to the `JSON` and `YAML` functions *can contain jq in
 
   After jq is run, the filter pipeline is emptied with `CLEAR_FILTERS`
 
-* `CLEAR_FILTERS` -- reset the current filter pipeline to empty.  This can be used at the end of a script to keep `jqmd` from running jq on stdin/stdout.
+* `CALL_JQ` *args...* -- exactly like `RUN_JQ`, except that the output of `jq` is captured into `$REPLY`.  You should use this instead of shell substitution to capture jq's output.
+
+* `CLEAR_FILTERS` -- reset the current filter pipeline and `JQ_OPTS` to empty.  This can be used at the end of a script to keep `jqmd` from running jq on stdin/stdout.
 
 * `HAVE_FILTERS` -- succeeds if there is anything in the filter pipeline at the time of excution, fails otherwise. (i.e., you can use `if HAVE_FILTERS; then ...` to take action in a script based on the current filter state.
+
+Note: piping into `RUN_JQ` or `CALL_JQ`, or invoking them in a subshell or shell substituion will *not* reset the current filter pipeline.  To capture jq's output, use `CALL_JQ` instead of shell substitution.  To pipe input into jq, pass it as a post-`--` argument to `RUN_JQ` or `CALL_JQ`, e.g.:
+
+~~~sh
+$ echo '"something"' | RUN_JQ .       # WRONG: CLEAR_FILTERS won't run
+$ RUN_JQ . -- <(echo '"something"')   # RIGHT: use process substitution instead of piping
+
+$ foo bar "$(RUN_JQ)"        # WRONG: CLEAR_FILTERS won't run
+$ CALL_JQ; foo bar "$REPLY"  # RIGHT
+~~~
 
 #### Command-line Arguments
 
