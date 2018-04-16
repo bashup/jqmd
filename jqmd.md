@@ -70,31 +70,31 @@ ARGJSON() { JQ_OPTS --argjson "$1" "$2"; }
 
 ```bash runtime
 JQ_CMD() {
-    local f= opt nargs cmd=(jq); set -- "${JQ_OPTS[@]:1}" "$@"
+	local f= opt nargs cmd=(jq); set -- "${JQ_OPTS[@]:1}" "$@"
 
-    while (($#)); do
-        case "$1" in
-        -f|--fromfile)
-             opt=$(<"$2") || return 69
-             FILTER "$opt"; shift 2; continue
-             ;;
-        -L|--indent)                            nargs=2 ;;
-        --arg|--arjgson|--slurpfile|--argfile)  nargs=3 ;;
-        --)  break   ;; # rest of args are data files
-        -*)  nargs=1 ;;
-        *)   FILTER "$1"; break ;; # jq program: data files follow
-        esac
-        cmd+=("${@:1:$nargs}")    # add $nargs args to cmd
-        shift $nargs
-    done
+	while (($#)); do
+		case "$1" in
+		-f|--fromfile)
+			opt=$(<"$2") || return 69
+			FILTER "$opt"; shift 2; continue
+			;;
+		-L|--indent)                            nargs=2 ;;
+		--arg|--arjgson|--slurpfile|--argfile)  nargs=3 ;;
+		--)  break   ;; # rest of args are data files
+		-*)  nargs=1 ;;
+		*)   FILTER "$1"; break ;;	# jq program: data files follow
+		esac
+		cmd+=("${@:1:$nargs}")	# add $nargs args to cmd
+		shift $nargs
+	done
 
-    HAVE_FILTERS || FILTER .    # jq needs at least one filter expression
-    for REPLY in "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"; do
-        [[ $REPLY ]] && f+=${f:+$'\n'}$REPLY
-    done
+	HAVE_FILTERS || FILTER .    # jq needs at least one filter expression
+	for REPLY in "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"; do
+		[[ $REPLY ]] && f+=${f:+$'\n'}$REPLY
+	done
 
-    REPLY=("${cmd[@]}" "$f" "${@:2}")
-    CLEAR_FILTERS   # cleanup for any re-runs
+	REPLY=("${cmd[@]}" "$f" "${@:2}")
+	CLEAR_FILTERS   # cleanup for any re-runs
 }
 
 RUN_JQ() { JQ_CMD "$@" && "${REPLY[@]}"; }
@@ -143,17 +143,17 @@ YAML blocks are allowed to have jq string interpolation expressions.  But since 
 
 ```bash runtime
 y2j() {
-    local p j="$(echo "$1" | yaml2json)" || return $?; REPLY=
-    while [[ $j == *'\\('* ]]; do
-        p=${j%%'\\('*}; j=${j#"$p"'\\('}
-        if [[ $p =~ (^|[^\\])('\\\\')*$ ]]; then
-            p="${p}"'\(' # odd, unbalance the backslash
-        else
-            p="${p}("   # even, remove one actual backslash
-        fi
-        REPLY+=$p
-    done
-    REPLY+=$j
+	local p j="$(echo "$1" | yaml2json)" || return $?; REPLY=
+	while [[ $j == *'\\('* ]]; do
+		p=${j%%'\\('*}; j=${j#"$p"'\\('}
+		if [[ $p =~ (^|[^\\])('\\\\')*$ ]]; then
+			p="${p}"'\(' # odd, unbalance the backslash
+		else
+			p="${p}("   # even, remove one actual backslash
+		fi
+		REPLY+=$p
+	done
+	REPLY+=$j
 }
 ```
 #### YAML to JSON Conversion (yaml2json)
@@ -164,22 +164,22 @@ The `yaml2json` function is a wrapper that automatically selects one of `yaml2js
 yaml2json:cmd() { command yaml2json /dev/stdin; }
 
 yaml2json:py() {
-    python -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)'
+	python -c 'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)'
 }
 
 yaml2json:php() { command yaml2json.php; }
 
 yaml2json() {
-    local kind  # auto-select between available yaml2json implementations
-    for kind in cmd py php; do
-        REPLY=($(yaml2json:$kind < <(echo "a: {}") 2>/dev/null || true))
-        printf -v REPLY %s ${REPLY+"${REPLY[@]}"}
-        if [[ "$REPLY" == '{"a":{}}' ]]; then
-            eval "yaml2json() { yaml2json:$kind; }"; yaml2json; return
-        fi
-    done
-    mdsh-error "To process YAML, must have one of: yaml2json, PyYAML, or yaml2json.php"
-    exit 69 # EX_UNAVAILABLE
+	local kind  # auto-select between available yaml2json implementations
+	for kind in cmd py php; do
+		REPLY=($(yaml2json:$kind < <(echo "a: {}") 2>/dev/null || true))
+		printf -v REPLY %s ${REPLY+"${REPLY[@]}"}
+		if [[ "$REPLY" == '{"a":{}}' ]]; then
+			eval "yaml2json() { yaml2json:$kind; }"; yaml2json; return
+		fi
+	done
+	mdsh-error "To process YAML, must have one of: yaml2json, PyYAML, or yaml2json.php"
+	exit 69 # EX_UNAVAILABLE
 }
 
 # --- END jqmd runtime ---
@@ -200,11 +200,11 @@ mdsh-compile-yaml() { y2j "$1"; mdsh-compile-json "$REPLY"; }
 mdsh-compile-json() { mdsh-compile-jq "$jqmd_data($1)"; }
 
 const() {
-    case "${tag_words-}" in
-    yaml|yml) y2j "$block"; printf "DEFINE %q\n" "def $1: $REPLY ;" ;;
-    json)     printf "DEFINE %q\n" "def $1: $block ;" ;;
-    *) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
-    esac
+	case "${tag_words-}" in
+	yaml|yml) y2j "$block"; printf "DEFINE %q\n" "def $1: $REPLY ;" ;;
+	json)     printf "DEFINE %q\n" "def $1: $block ;" ;;
+	*) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
+	esac
 }
 ```
 
@@ -226,9 +226,9 @@ It also defines a few command line options for controlling compilation:
 ```shell
 mdsh.--no-runtime() ( unset -f mdsh:file-header mdsh:file-footer; mdsh-main "$@"; )
 mdsh.--yaml() (
-    fn-exists "yaml2json:${1-}" || mdsh-error "No such yaml2json processor: ${1-}" || exit $?
-    eval 'yaml2json() { yaml2json:'"$1"'; }'
-    mdsh-main "${@:2}"
+	fn-exists "yaml2json:${1-}" || mdsh-error "No such yaml2json processor: ${1-}" || exit $?
+	eval 'yaml2json() { yaml2json:'"$1"'; }'
+	mdsh-main "${@:2}"
 )
 
 mdsh.-R() { mdsh.--no-runtime "$@"; }

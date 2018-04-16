@@ -219,11 +219,11 @@ run-markdown() {
 mdsh_raw_bash_runtime+=($'#!/usr/bin/env bash\n\n# --- BEGIN jqmd runtime ---\n')
 mdsh_raw_bash_runtime+=($'jqmd_imports=\njqmd_filters=\njqmd_defines=\n\nHAVE_FILTERS() { [[ ${jqmd_filters-} ]]; }\nCLEAR_FILTERS() { unset jqmd_filters; JQ_OPTS=(jq); }\n\nIMPORTS() { jqmd_imports+="${jqmd_imports:+$\'\\n\'}$1"; }\nDEFINE()  { jqmd_defines+="${jqmd_defines:+$\'\\n\'}$1"; }\nFILTER()  { jqmd_filters+="${jqmd_filters:+|}$1"; }\n')
 mdsh_raw_bash_runtime+=($'JQ_OPTS=(jq)\nJQ_OPTS() { JQ_OPTS+=("$@"); }\nARG()     { JQ_OPTS --arg     "$1" "$2"; }\nARGJSON() { JQ_OPTS --argjson "$1" "$2"; }\n')
-mdsh_raw_bash_runtime+=($'JQ_CMD() {\n    local f= opt nargs cmd=(jq); set -- "${JQ_OPTS[@]:1}" "$@"\n\n    while (($#)); do\n        case "$1" in\n        -f|--fromfile)\n             opt=$(<"$2") || return 69\n             FILTER "$opt"; shift 2; continue\n             ;;\n        -L|--indent)                            nargs=2 ;;\n        --arg|--arjgson|--slurpfile|--argfile)  nargs=3 ;;\n        --)  break   ;; # rest of args are data files\n        -*)  nargs=1 ;;\n        *)   FILTER "$1"; break ;; # jq program: data files follow\n        esac\n        cmd+=("${@:1:$nargs}")    # add $nargs args to cmd\n        shift $nargs\n    done\n\n    HAVE_FILTERS || FILTER .    # jq needs at least one filter expression\n    for REPLY in "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"; do\n        [[ $REPLY ]] && f+=${f:+$\'\\n\'}$REPLY\n    done\n\n    REPLY=("${cmd[@]}" "$f" "${@:2}")\n    CLEAR_FILTERS   # cleanup for any re-runs\n}\n\nRUN_JQ() { JQ_CMD "$@" && "${REPLY[@]}"; }\nCALL_JQ() { JQ_CMD "$@" && REPLY=("$("${REPLY[@]}")"); }\n')
+mdsh_raw_bash_runtime+=($'JQ_CMD() {\n\tlocal f= opt nargs cmd=(jq); set -- "${JQ_OPTS[@]:1}" "$@"\n\n\twhile (($#)); do\n\t\tcase "$1" in\n\t\t-f|--fromfile)\n\t\t\topt=$(<"$2") || return 69\n\t\t\tFILTER "$opt"; shift 2; continue\n\t\t\t;;\n\t\t-L|--indent)                            nargs=2 ;;\n\t\t--arg|--arjgson|--slurpfile|--argfile)  nargs=3 ;;\n\t\t--)  break   ;; # rest of args are data files\n\t\t-*)  nargs=1 ;;\n\t\t*)   FILTER "$1"; break ;;\t# jq program: data files follow\n\t\tesac\n\t\tcmd+=("${@:1:$nargs}")\t# add $nargs args to cmd\n\t\tshift $nargs\n\tdone\n\n\tHAVE_FILTERS || FILTER .    # jq needs at least one filter expression\n\tfor REPLY in "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"; do\n\t\t[[ $REPLY ]] && f+=${f:+$\'\\n\'}$REPLY\n\tdone\n\n\tREPLY=("${cmd[@]}" "$f" "${@:2}")\n\tCLEAR_FILTERS   # cleanup for any re-runs\n}\n\nRUN_JQ() { JQ_CMD "$@" && "${REPLY[@]}"; }\nCALL_JQ() { JQ_CMD "$@" && REPLY=("$("${REPLY[@]}")"); }\n')
 mdsh_raw_bash_runtime+=($'jqmd_data=jqmd::data\n@data() { jqmd_data="${1-}"; }\n\nYAML()  { y2j "$1"; JSON "$REPLY"; }\nJSON()  { FILTER "$jqmd_data($1)"; }\n')
 mdsh_raw_bash_runtime+=($'DEFINE \'\ndef jqmd::blend($other; combine): . as $this | . *  $other | . as $combined | with_entries(\n  if (.key | in($this)) and (.key | in($other)) then\n    .this = $this[.key] | .other = $other[.key] | combine\n  else . end\n);\n\ndef jqmd::combine: (.this|type) as $this | (.other|type) as $other | .value =\n  if $this == "array" then\n    if $other == "array" then .this + .other else .this + [.other] end\n  elif $this == "object" then\n    if $other == "object" then\n      .other as $o | (.this | jqmd::blend($o; jqmd::combine))\n    else .other end\n  else .other end;  # everything else just overrides\n\ndef jqmd::data($data): {this: ., other:$data} | jqmd::combine | .value ;\n\'\n')
-mdsh_raw_bash_runtime+=($'y2j() {\n    local p j="$(echo "$1" | yaml2json)" || return $?; REPLY=\n    while [[ $j == *\'\\\\(\'* ]]; do\n        p=${j%%\'\\\\(\'*}; j=${j#"$p"\'\\\\(\'}\n        if [[ $p =~ (^|[^\\\\])(\'\\\\\\\\\')*$ ]]; then\n            p="${p}"\'\\(\' # odd, unbalance the backslash\n        else\n            p="${p}("   # even, remove one actual backslash\n        fi\n        REPLY+=$p\n    done\n    REPLY+=$j\n}\n')
-mdsh_raw_bash_runtime+=($'yaml2json:cmd() { command yaml2json /dev/stdin; }\n\nyaml2json:py() {\n    python -c \'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)\'\n}\n\nyaml2json:php() { command yaml2json.php; }\n\nyaml2json() {\n    local kind  # auto-select between available yaml2json implementations\n    for kind in cmd py php; do\n        REPLY=($(yaml2json:$kind < <(echo "a: {}") 2>/dev/null || true))\n        printf -v REPLY %s ${REPLY+"${REPLY[@]}"}\n        if [[ "$REPLY" == \'{"a":{}}\' ]]; then\n            eval "yaml2json() { yaml2json:$kind; }"; yaml2json; return\n        fi\n    done\n    mdsh-error "To process YAML, must have one of: yaml2json, PyYAML, or yaml2json.php"\n    exit 69 # EX_UNAVAILABLE\n}\n\n# --- END jqmd runtime ---\n')
+mdsh_raw_bash_runtime+=($'y2j() {\n\tlocal p j="$(echo "$1" | yaml2json)" || return $?; REPLY=\n\twhile [[ $j == *\'\\\\(\'* ]]; do\n\t\tp=${j%%\'\\\\(\'*}; j=${j#"$p"\'\\\\(\'}\n\t\tif [[ $p =~ (^|[^\\\\])(\'\\\\\\\\\')*$ ]]; then\n\t\t\tp="${p}"\'\\(\' # odd, unbalance the backslash\n\t\telse\n\t\t\tp="${p}("   # even, remove one actual backslash\n\t\tfi\n\t\tREPLY+=$p\n\tdone\n\tREPLY+=$j\n}\n')
+mdsh_raw_bash_runtime+=($'yaml2json:cmd() { command yaml2json /dev/stdin; }\n\nyaml2json:py() {\n\tpython -c \'import sys, yaml, json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)\'\n}\n\nyaml2json:php() { command yaml2json.php; }\n\nyaml2json() {\n\tlocal kind  # auto-select between available yaml2json implementations\n\tfor kind in cmd py php; do\n\t\tREPLY=($(yaml2json:$kind < <(echo "a: {}") 2>/dev/null || true))\n\t\tprintf -v REPLY %s ${REPLY+"${REPLY[@]}"}\n\t\tif [[ "$REPLY" == \'{"a":{}}\' ]]; then\n\t\t\teval "yaml2json() { yaml2json:$kind; }"; yaml2json; return\n\t\tfi\n\tdone\n\tmdsh-error "To process YAML, must have one of: yaml2json, PyYAML, or yaml2json.php"\n\texit 69 # EX_UNAVAILABLE\n}\n\n# --- END jqmd runtime ---\n')
 # Language Support
 mdsh-compile-jq()         { printf 'FILTER %q\n' "$1"; }
 mdsh-compile-jq_defs()    { printf 'DEFINE %q\n' "$1"; }
@@ -234,11 +234,11 @@ mdsh-compile-yaml() { y2j "$1"; mdsh-compile-json "$REPLY"; }
 mdsh-compile-json() { mdsh-compile-jq "$jqmd_data($1)"; }
 
 const() {
-    case "${tag_words-}" in
-    yaml|yml) y2j "$block"; printf "DEFINE %q\n" "def $1: $REPLY ;" ;;
-    json)     printf "DEFINE %q\n" "def $1: $block ;" ;;
-    *) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
-    esac
+	case "${tag_words-}" in
+	yaml|yml) y2j "$block"; printf "DEFINE %q\n" "def $1: $REPLY ;" ;;
+	json)     printf "DEFINE %q\n" "def $1: $block ;" ;;
+	*) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
+	esac
 }
 # Load the runtime so it's usable by mdsh
 printf -v REPLY '%s\n' "${mdsh_raw_bash_runtime[@]}"; eval "$REPLY"
@@ -250,9 +250,9 @@ printf -v REPLY 'mdsh:file-header() { ! @is-main || echo -n %q; }' "$REPLY"; eva
 mdsh:file-footer() { ! @is-main || echo 'if [[ $0 == ${BASH_SOURCE-} ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
 mdsh.--no-runtime() ( unset -f mdsh:file-header mdsh:file-footer; mdsh-main "$@"; )
 mdsh.--yaml() (
-    fn-exists "yaml2json:${1-}" || mdsh-error "No such yaml2json processor: ${1-}" || exit $?
-    eval 'yaml2json() { yaml2json:'"$1"'; }'
-    mdsh-main "${@:2}"
+	fn-exists "yaml2json:${1-}" || mdsh-error "No such yaml2json processor: ${1-}" || exit $?
+	eval 'yaml2json() { yaml2json:'"$1"'; }'
+	mdsh-main "${@:2}"
 )
 
 mdsh.-R() { mdsh.--no-runtime "$@"; }
