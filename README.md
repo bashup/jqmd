@@ -150,7 +150,11 @@ DEFINE 'def jqmd::data($arg): recursive_add($arg);'
 
     (Well, technically, you *can* include filtering expressions in a `DEFINE` block, but it's not recommended, and you would then have to end the block with a `|` to get a syntactically-correct jq program.)
 
-* `FILTER` *arg* -- add the given jq expression to the jq filter pipeline.  The expression is automatically prefixed with `|` if any filter expressions have already been added to the pipeline.  (This function is the programmatic equivalent of including a `jq` code block at the current point of execution.)
+* `FILTER` *expr [args...]* -- add the given jq expression to the jq filter pipeline.  The expression is automatically prefixed with `|` if any filter expressions have already been added to the pipeline.  (This function is the programmatic equivalent of including a `jq` code block at the current point of execution.)
+
+  If any arguments are supplied after *expr*, they are inserted wherever `%s` appears in it.  (So `FILTER "foo(%s; %s)" bar baz` will expand to something like `foo($JQMD_QA_1, $JQMD_QA_4)`, with `--arg JQMD_QA_1 bar --arg JQMD_QA_4 baz` added to the jq command line.  In this way, you can insert arbitrary strings into a jq expression, even if they contain characters that must be escaped in JSON.
+
+  If you are using arguments, please note that you must 1) only put `%s` in parts of the expression where a jq *variable* can appear, 2) escape all other uses of `%` by doubling them (`%%`), and 3) make sure you have the same number of `%s`s in *expr* as you have additional arguments.  (None of these rules apply if you only supply *expr* with no *args*.)
 
   Every `jq`-tagged code block or `FILTER` argument **must** contain a jq expression.  Since jq expressions can begin with function definitions, this means that you can begin a filter with function definitions.  This can be useful for redefining `jqmd::data` or other functions at various points within your filter pipeline, or to define functions that will only be used for one `RUN_JQ` pipeline.
 
@@ -167,9 +171,9 @@ DEFINE 'def jqmd::data($arg): recursive_add($arg);'
 
   This "end function-only filters with a ." rule applies whether you're using `jq`-tagged code blocks or the `FILTER` function.
 
-* `JSON`  *arg* -- a shortcut for  `FILTER "jqmd::data("`*arg*`")"`.  This function is the programmatic equivalent of including a `json` code block at the current point of execution.
+* `JSON`  *data [args...]* -- a shortcut for  `FILTER "jqmd::data("`*data*`")"` *args...*.  This function is the programmatic equivalent of including a `json` code block at the current point of execution, but it can also include interpolated args, as with `FILTER` (and the same rules for `%s` and escaping `%` apply if you supply any *args*).
 
-* `YAML` *arg* -- a shortcut for  `FILTER "jqmd::data("`*arg-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, the system default `python` has PyYAML installed, or [yaml2json.php](https://packagist.org/packages/dirtsimple/yaml2json) is on the system `PATH`.)
+* `YAML` *data* -- a shortcut for  `FILTER "jqmd::data("`*data-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, the system default `python` has PyYAML installed, or [yaml2json.php](https://packagist.org/packages/dirtsimple/yaml2json) is on the system `PATH`.)
 
 * `@data` *jq-funcname* -- change the default data wrapper function from `jqmd::data` to *jq-funcname*.  If used in a `mdsh` or `shell mdsh` block, it changes this for `yaml` and `json` blocks; if used in a regular `shell` block, it changes the data wrapper used by the `YAML` and `JSON` functions.
 
@@ -183,6 +187,7 @@ Also note that data passed to the `JSON` and `YAML` functions *can contain jq in
 
 * `JQ_OPTS` *opts...* -- add *opts* to the jq command line being built up.  Whenever jq is run (either explicitly using `RUN_JQ` or `CALL_JQ`, or implicitly at the end of the document), the given options will be part of the command line.
 * `ARG` *name value* -- define a jq variable named `$`*name*, with the supplied string value.  (Shortcut for  `JQ_OPTS --arg name value`.)
+* `ARGQUOTE` *value* -- like `ARG`, but instead of passing in an argument name, a unique argument name is generated, and returned in `$REPLY`.  The returned string will expand as *value* in any jq expressions.
 * `ARGJSON` *name json-value* -- define a jq variable named `$`*name*, with the supplied JSON value.  (Shortcut for `JQ_OPTS --argjson name json`.)  This is especially useful for passing the output of other programs or data files as arguments to your jq code, e.g. `ARGJSON something "$(wp option get something --format=json)"`.
 
 

@@ -37,6 +37,26 @@ And then reset with `CLEAR_FILTERS`:
     jq
 ````
 
+You can generate args with `ARGQUOTE`:
+
+~~~shell
+    $ ARGQUOTE 'foo"bar'; echo $REPLY
+    $JQMD_QA_1
+    $ ARGQUOTE spammity; echo $REPLY
+    $JQMD_QA_4
+~~~
+
+and also via extra args to `FILTER` or `JSON`:
+
+~~~shell
+    $ FILTER 'foo(%s; %s)' bar 'baz"spam'; echo $jqmd_filters
+    foo($JQMD_QA_7; $JQMD_QA_10)
+
+    $ CLEAR_FILTERS
+    $ JSON '{%s: %s}' foo bar; echo "${JQ_OPTS[@]}"
+    jq --arg JQMD_QA_1 foo --arg JQMD_QA_4 bar
+~~~
+
 ### Invoking JQ
 
 The `JQ_CMD` function adds the supplied args to `$JQOPTS` and combines them with the current imports, defines, and filters to generate a command line in `${REPLY[@]}`.  It also resets the current filters and options.
@@ -44,6 +64,7 @@ The `JQ_CMD` function adds the supplied args to `$JQOPTS` and combines them with
 ````sh
     $ JQ() { JQ_CMD "$@" || return; printf ' %q' "${REPLY[@]}"; echo; }
     $ jqmd_defines=
+    $ CLEAR_FILTERS
 
 # No filters specified, default to '.'
 

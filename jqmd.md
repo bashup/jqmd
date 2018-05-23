@@ -54,7 +54,15 @@ CLEAR_FILTERS() { unset jqmd_filters; JQ_OPTS=(jq); }
 
 IMPORTS() { jqmd_imports+="${jqmd_imports:+$'\n'}$1"; }
 DEFINE()  { jqmd_defines+="${jqmd_defines:+$'\n'}$1"; }
-FILTER()  { jqmd_filters+="${jqmd_filters:+|}$1"; }
+FILTER()  {
+	case $# in
+	1) jqmd_filters+="${jqmd_filters:+|}$1"; return ;;
+	0) return ;;
+	esac
+	local REPLY ARGS=(printf -v REPLY "$1"); shift
+	for REPLY; do ARGQUOTE "$REPLY"; ARGS+=("$REPLY"); done
+	"${ARGS[@]}"; FILTER "$REPLY"
+}
 ```
 
 ### jq options and arguments
@@ -64,6 +72,7 @@ JQ_OPTS=(jq)
 JQ_OPTS() { JQ_OPTS+=("$@"); }
 ARG()     { JQ_OPTS --arg     "$1" "$2"; }
 ARGJSON() { JQ_OPTS --argjson "$1" "$2"; }
+ARGQUOTE() { REPLY=JQMD_QA_${#JQ_OPTS[@]}; ARG "$REPLY" "$1"; REPLY='$'$REPLY; }
 ```
 
 ### Invoking jq
@@ -110,7 +119,7 @@ jqmd_data=jqmd::data
 @data() { jqmd_data="${1-}"; }
 
 YAML()  { y2j "$1"; JSON "$REPLY"; }
-JSON()  { FILTER "$jqmd_data($1)"; }
+JSON()  { FILTER "$jqmd_data($1)" "${@:2}"; }
 ```
 
 #### jqmd::data
