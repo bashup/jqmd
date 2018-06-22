@@ -200,9 +200,9 @@ The non-runtime part of the program defines hooks for mdsh to be able to compile
 
 ```shell
 # Language Support
-mdsh-compile-jq()         { printf 'FILTER %q\n' "$1"; }
-mdsh-compile-jq_defs()    { printf 'DEFINE %q\n' "$1"; }
-mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"; }
+mdsh-compile-jq()         { printf 'FILTER %q\n' "$1"$'\n'; }
+mdsh-compile-jq_defs()    { printf 'DEFINE %q\n' "$1"$'\n'; }
+mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"$'\n'; }
 
 mdsh-compile-yml()  { y2j "$1"; mdsh-compile-json "$REPLY"; }
 mdsh-compile-yaml() { y2j "$1"; mdsh-compile-json "$REPLY"; }
@@ -210,8 +210,8 @@ mdsh-compile-json() { mdsh-compile-jq "$jqmd_data($1)"; }
 
 const() {
 	case "${tag_words-}" in
-	yaml|yml) y2j "$block"; printf "DEFINE %q\n" "def $1: $REPLY ;" ;;
-	json)     printf "DEFINE %q\n" "def $1: $block ;" ;;
+	yaml|yml) y2j "$block"; printf "DEFINE %q\n" "def $1: $REPLY ;"$'\n' ;;
+	json)     printf "DEFINE %q\n" "def $1: $block ;"$'\n' ;;
 	*) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
 	esac
 }
