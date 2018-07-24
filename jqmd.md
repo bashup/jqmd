@@ -206,12 +206,14 @@ mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"$'\n'; }
 
 mdsh-compile-yml()  { y2j "$1"; mdsh-compile-json "$REPLY"; }
 mdsh-compile-yaml() { y2j "$1"; mdsh-compile-json "$REPLY"; }
+
+# shellcheck disable=SC2154  # jqmd_data is initialized by the runtime
 mdsh-compile-json() { mdsh-compile-jq "$jqmd_data($1)"; }
 
 const() {
 	case "${tag_words-}" in
-	yaml|yml) y2j "$block"; printf "DEFINE %q\n" "def $1: $REPLY ;"$'\n' ;;
-	json)     printf "DEFINE %q\n" "def $1: $block ;"$'\n' ;;
+	yaml|yml) y2j "$block"; printf 'DEFINE %q\n' "def $1: $REPLY ;"$'\n' ;;
+	json)     printf 'DEFINE %q\n' "def $1: $block ;"$'\n' ;;
 	*) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
 	esac
 }
@@ -227,7 +229,7 @@ printf -v REPLY '%s\n' "${mdsh_raw_bash_runtime[@]}"; eval "$REPLY"
 printf -v REPLY 'mdsh:file-header() { ! @is-main || echo -n %q; }' "$REPLY"; eval "$REPLY"
 
 # Ensure (main) scripts process any leftover filters at end
-mdsh:file-footer() { ! @is-main || echo 'if [[ $0 == ${BASH_SOURCE-} ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
+mdsh:file-footer() { ! @is-main || echo $'if [[ $0 == "${BASH_SOURCE[0]-}" ]] && HAVE_FILTERS; then RUN_JQ; fi'; }
 ```
 
 It also defines a few command line options for controlling compilation:
@@ -243,5 +245,3 @@ mdsh.--yaml() (
 mdsh.-R() { mdsh.--no-runtime "$@"; }
 mdsh.-y() { mdsh.--yaml "$@"; }
 ```
-
-
