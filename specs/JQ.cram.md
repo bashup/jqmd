@@ -46,15 +46,18 @@ You can generate args with `ARGQUOTE`:
     $JQMD_QA_4
 ~~~
 
-and also via extra args to `FILTER` or `JSON`:
+JSON quoting can be done with `JSON-QUOTE`, or via extra args to `FILTER` or `JSON`:
 
 ~~~shell
+    $ JSON-QUOTE $'\n\r\t' $'\x01\x1f' "\\"; echo "${REPLY[@]}"
+    "\n\r\t" "\u0001\u001f" "\\"
+
     $ FILTER 'foo(%s; %s)' bar 'baz"spam'; echo $jqmd_filters
-    foo($JQMD_QA_7; $JQMD_QA_10)
+    foo("bar"; "baz\"spam")
 
     $ CLEAR_FILTERS
-    $ JSON '{%s: %s}' foo bar; echo "${JQ_OPTS[@]}"
-    jq --arg JQMD_QA_1 foo --arg JQMD_QA_4 bar
+    $ JSON '{%s: %s}' foo bar; echo $jqmd_filters
+    jqmd_data({"foo": "bar"})
 ~~~
 
 ### Invoking JQ

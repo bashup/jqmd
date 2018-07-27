@@ -60,8 +60,23 @@ FILTER()  {
 	0) return ;;
 	esac
 	local REPLY ARGS=(printf -v REPLY "$1"); shift
-	for REPLY; do ARGQUOTE "$REPLY"; ARGS+=("$REPLY"); done
-	"${ARGS[@]}"; FILTER "$REPLY"
+	JSON-QUOTE "$@"; ARGS+=("${REPLY[@]}"); "${ARGS[@]}"; FILTER "$REPLY"
+}
+
+JSON-QUOTE() {
+	set -- "${@//\\/\\\\}";   set -- "${@//\"/\\\"}"   # \ and "
+	set -- "${@//$'\n'/\\n}"; set -- "${@//$'\r'/\\r}"; set -- "${@//$'\t'/\\t}"  # \n\r\t
+	set -- "${@/#/\"}";       set -- "${@/%/\"}"  # leading and trailing '"'
+	REPLY=(); local s r
+	while (($#)); do
+		s=${1//[^$'\x01'-$'\x1F']/};
+		while [[ $s ]]; do
+			printf -v r \\\\u%04x "'${s:0:1}"
+			set -- "${@//"${s:0:1}"/"$r"}"
+			s=${s//"${s:0:1}"/}
+		done
+		REPLY+=("$1"); shift
+	done
 }
 ```
 
@@ -115,11 +130,8 @@ CALL_JQ() { JQ_CMD "$@" && REPLY=("$("${REPLY[@]}")"); }
 YAML and JSON blocks are just jq filter expressions wrapped in a call to `jqmd::data()` (or an appropriate alternative, selected by a `@data` directive in a mdsh block).
 
 ```bash runtime
-jqmd_data=jqmd::data
-@data() { jqmd_data="${1-}"; }
-
 YAML()  { y2j "$1"; JSON "$REPLY"; }
-JSON()  { FILTER "$jqmd_data($1)" "${@:2}"; }
+JSON()  { FILTER "jqmd_data($1)" "${@:2}"; }
 ```
 
 #### jqmd::data
@@ -144,6 +156,7 @@ def jqmd::combine: (.this|type) as $this | (.other|type) as $other | .value =
   else .other end;  # everything else just overrides
 
 def jqmd::data($data): {this: ., other:$data} | jqmd::combine | .value ;
+def jqmd_data($data): jqmd::data($data) ;
 '
 ```
 #### YAML Interpolation
@@ -206,9 +219,7 @@ mdsh-compile-jq_imports() { printf 'IMPORTS %q\n' "$1"$'\n'; }
 
 mdsh-compile-yml()  { y2j "$1"; mdsh-compile-json "$REPLY"; }
 mdsh-compile-yaml() { y2j "$1"; mdsh-compile-json "$REPLY"; }
-
-# shellcheck disable=SC2154  # jqmd_data is initialized by the runtime
-mdsh-compile-json() { mdsh-compile-jq "$jqmd_data($1)"; }
+mdsh-compile-json() { mdsh-compile-jq "jqmd_data($1)"; }
 
 const() {
 	case "${tag_words-}" in

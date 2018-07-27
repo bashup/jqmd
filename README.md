@@ -42,24 +42,24 @@ Running `jqmd some-document.md args...` will read and interpret unindented, trip
 
 * `jq imports` -- jq module includes or imports, which are accumulated over the course of the program run, and included at the start of any executed filter pipelines (before the current set of `jq defs`).
 
-* `yaml`, `json` -- YAML data or JSON expressions, which are added to the jq filter pipeline as `jqmd::data(data)`.  (Which turns the given data into a jq filter to modify an existing data structure; see [Data Merging](#data-merging), below for more details).  Data blocks can also be tagged as "named constants": a code block starting with e.g. `````yaml !const foo`` will have its contents defined as a zero-argument jq function named `foo`.
+* `yaml`, `json` -- YAML data or JSON expressions, which are added to the jq filter pipeline as `jqmd_data(data)`.  (Which turns the given data into a jq filter to modify an existing data structure; see [Data Merging](#data-merging), below for more details).  Data blocks can also be tagged as "named constants": a code block starting with e.g. `````yaml !const foo`` will have its contents defined as a zero-argument jq function named `foo`.
 
   That is, the following two code blocks do the exact same thing:
 
   ~~~markdown
-  ​```jq defs
-  def pi: jqmd::data(3.14159);
-  ​```
-  ​```json !const pi
+  ```jq defs
+  def pi: jqmd_data(3.14159);
+  ```
+  ```json !const pi
   3.14159
-  ​```
+  ```
   ~~~
 
   (Note: YAML data can only be processed if there is a `yaml2json` executable on `PATH`, the system `python` interpreter has PyYAML installed, or [yaml2json.php](https://packagist.org/packages/dirtsimple/yaml2json) is installed; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as its process startup time alone is considerably smaller than that of Python or PHP.)
 
   Both YAML and JSON blocks can contain **jq string interpolation expressions**, denoted by ``\( )``.  For example, a JSON block containing ``{ "foo": "\(env.BAR)"}`` will cause jq to insert the contents of the environment variable `BAR` into the data structure at the appropriate point.  (Note that this means that if you have a backslash before a `(` in your YAML blocks and you *don't* want it to be treated as interpolation, you will need to add an extra backslash in front of it.)
 
-  (In addition, `json` blocks do not have to be valid JSON: they can actually contain arbitrary jq expressions.  The only real difference between a `json` block and a `jq` block is that it's automatically wrapped in a call to `jqmd::data()`.)
+  (In addition, `json` blocks do not have to be valid JSON: they can actually contain arbitrary jq expressions.  The only real difference between a `json` block and a `jq` block is that a JSON block is automatically wrapped in a call to `jqmd_data()`.)
 
 (As with `mdsh`, you can extend the above list by defining appropriate hook functions in `mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
 
@@ -83,13 +83,19 @@ Also as with `mdsh`, you can run `jqmd --compile` to output a bash version of yo
 
 #### Data Merging
 
-In a jqmd program, one is often incrementally defining some sort of data structure (such as, e.g. a docker-compose project specification, or a set of Wordpress options).  While jq expressions can be used directly to manipulate such a data structure, a more intuitive way to express such data structures is as a series of JSON or YAML blocks that are combined in some way.  For this reason, jqmd defines an intuitive data structure merging function to apply such data blocks to an existing data structure.  This merging function is exposed to jqmd programs as  `jqmd::data($data)`, and a call to it is wrapped around JSON and YAML blocks by default.  The merge algorithm is as follows:
+In a jqmd program, one is often incrementally defining some sort of data structure (such as, e.g. a docker-compose project specification, or a set of Wordpress options).  While jq expressions can be used directly to manipulate such a data structure, a more intuitive way to express such data structures is as a series of JSON or YAML blocks that are combined in some way.  For this reason, jqmd defines an intuitive data structure merging function to apply such data blocks to an existing data structure.  This merging function is exposed to jqmd programs as `jqmd::data($data)`, and is used by default to merge JSON and YAML data.  The merge algorithm is as follows:
 
 * If `.` is an array, add `$data` to it (concatenating if `$data` is also an array, otherwise appending)
 * If `.` and `$data` are both objects, recursively merge their values using this same algorithm
 * In all other cases, return `$data`
 
-For most programs, this algorithm is sufficient to do most incremental data structure creation.  If you have different needs, however, you can use the `@data` directive in a `mdsh` (or `shell mdsh`) block, to specify a different jq function that will wrap `JSON` and `YAML` data.  (For example `@data foo` will use `foo(...data)` instead of `jqmd::data(...data)`.)
+For most programs, this algorithm is sufficient to do most incremental data structure creation.  If you have different needs, however, you can define a `jqmd_data` function of your own: JSON and YAML data are wrapped with a call to `jqmd_data`, but the default `jqmd_data` just calls `jqmd::data`.
+
+If you want to override the data merging for *all* data as of the start of the filter chain, you define a `jqmd_data` function in a `DEFINE` call or a `jq defs` block.  Or, you can override it for just a few filters or blocks by defining it in a `FILTER` call or `jq` block.  Afterwards, you can restore the original data merging algorithm like this:
+
+```shell
+FILTER 'def jqmd_data($data): jqmd::data($data) ; .'
+```
 
 ### Programming Models
 
@@ -127,7 +133,7 @@ def recursive_add($other): . as $original |
         (. // {}) * $other; setpath( $path; ($original | getpath($path)) + ($other | getpath($path)) )
     );
 '
-DEFINE 'def jqmd::data($arg): recursive_add($arg);'
+DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 ```
 
 #### Adding jq Code and Data
@@ -156,7 +162,7 @@ DEFINE 'def jqmd::data($arg): recursive_add($arg);'
 
   If you are using arguments, please note that you must 1) only put `%s` in parts of the expression where a jq *variable* can appear, 2) escape all other uses of `%` by doubling them (`%%`), and 3) make sure you have the same number of `%s`s in *expr* as you have additional arguments.  (None of these rules apply if you only supply *expr* with no *args*.)
 
-  Every `jq`-tagged code block or `FILTER` argument **must** contain a jq expression.  Since jq expressions can begin with function definitions, this means that you can begin a filter with function definitions.  This can be useful for redefining `jqmd::data` or other functions at various points within your filter pipeline, or to define functions that will only be used for one `RUN_JQ` pipeline.
+  Every `jq`-tagged code block or `FILTER` argument **must** contain a jq expression.  Since jq expressions can begin with function definitions, this means that you can begin a filter with function definitions.  This can be useful for redefining `jqmd_data` or other functions at various points within your filter pipeline, or to define functions that will only be used for one `RUN_JQ` pipeline.
 
   Bear in mind, however, that because a filter block *must* contain a valid jq expression, you may need to terminate your filter with a `.` if it contains only functions.  For example, this bit of `jq` code is a valid filter, because it ends with a `.`:
 
@@ -171,15 +177,15 @@ DEFINE 'def jqmd::data($arg): recursive_add($arg);'
 
   This "end function-only filters with a ." rule applies whether you're using `jq`-tagged code blocks or the `FILTER` function.
 
-* `JSON`  *data [args...]* -- a shortcut for  `FILTER "jqmd::data("`*data*`")"` *args...*.  This function is the programmatic equivalent of including a `json` code block at the current point of execution, but it can also include interpolated args, as with `FILTER` (and the same rules for `%s` and escaping `%` apply if you supply any *args*).
+* `JSON`  *data [args...]* -- a shortcut for  `FILTER "jqmd_data(`*data*`)"` *args...*.  This function is the programmatic equivalent of including a `json` code block at the current point of execution, but it can also include interpolated args, as with `FILTER` (and the same rules for `%s` and escaping `%` apply if you supply any *args*).
 
-* `YAML` *data* -- a shortcut for  `FILTER "jqmd::data("`*data-converted-to-json*`")"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, the system default `python` has PyYAML installed, or [yaml2json.php](https://packagist.org/packages/dirtsimple/yaml2json) is on the system `PATH`.)
-
-* `@data` *jq-funcname* -- change the default data wrapper function from `jqmd::data` to *jq-funcname*.  If used in a `mdsh` or `shell mdsh` block, it changes this for `yaml` and `json` blocks; if used in a regular `shell` block, it changes the data wrapper used by the `YAML` and `JSON` functions.
+* `YAML` *data* -- a shortcut for  `FILTER "jqmd_data(`*data-converted-to-json*`)"`.  This function is the programmatic equivalent of including a `yaml` code block at the current point of execution, and only works if there is a `yaml2json` converter on `PATH`, the system default `python` has PyYAML installed, or [yaml2json.php](https://packagist.org/packages/dirtsimple/yaml2json) is on the system `PATH`.)
 
 * `yaml2json` -- a filter that takes YAML or JSON input, and produces JSON output.  The actual implementation is system-dependent, using either a `yam2json` command line tool, Python, or PHP, depending on what's available.  This can be used to convert data, validate it, or to remove jq expressions from untrusted input.
 
-Notice that JSON and YAML blocks are always filtered through a `jqmd::data()` function, or the function specified by the last `@data` directive.  (Just remember that within each filter block, you can begin with function definitions but *must* end with an expression, even if it's only a `.`.)
+* `JSON-QUOTE` *strings...* -- set `REPLY` to an array containing the JSON-quoted version of *strings*.  Each element in the resulting array will begin and end with double quotes, and have proper backslash escapes for contained control characters, double quotes, and backslashes.
+
+Notice that JSON and YAML blocks are always filtered through a `jqmd_data()` function, which by default does [data merging](#data-merging), but you can always redefine the function to do something different, even as part of a `FILTER` or jq block. (Just remember that while filters can begin with function definitions, they must each *end* with an expression, even if it's only a `.`.)
 
 Also note that data passed to the `JSON` and `YAML` functions *can contain jq interpolation expressions*, which means that you **must not pass untrusted data to them**.  You can validate and/or neutralize such data by piping it through the `yaml2json` function before calling `JSON` on it.
 
