@@ -158,9 +158,9 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 * `FILTER` *expr [args...]* -- add the given jq expression to the jq filter pipeline.  The expression is automatically prefixed with `|` if any filter expressions have already been added to the pipeline.  (This function is the programmatic equivalent of including a `jq` code block at the current point of execution.)
 
-  If any arguments are supplied after *expr*, they are inserted wherever `%s` appears in it.  (So `FILTER "foo(%s; %s)" bar baz` will expand to something like `foo($JQMD_QA_1, $JQMD_QA_4)`, with `--arg JQMD_QA_1 bar --arg JQMD_QA_4 baz` added to the jq command line.  In this way, you can insert arbitrary strings into a jq expression, even if they contain characters that must be escaped in JSON.
+  If any arguments are supplied after *expr*, they are inserted as JSON-quoted strings wherever `%s` appears in it.  (So `FILTER "foo(%s; %s)" bar baz` will expand to `foo("bar", "baz")`.  In this way, you can insert arbitrary strings into a jq expression, even if they contain characters that must be escaped in JSON.
 
-  If you are using arguments, please note that you must 1) only put `%s` in parts of the expression where a jq *variable* can appear, 2) escape all other uses of `%` by doubling them (`%%`), and 3) make sure you have the same number of `%s`s in *expr* as you have additional arguments.  (None of these rules apply if you only supply *expr* with no *args*.)
+  If you are using arguments, *expr* is interpreted as a bash `printf` format string, which means that you must escape any actual `%` signs as `%%`, and should be careful with backslashes in it.  (If you don't pass any *args* after the *expr*, these issues don't apply, as the string is used as-is.)
 
   Every `jq`-tagged code block or `FILTER` argument **must** contain a jq expression.  Since jq expressions can begin with function definitions, this means that you can begin a filter with function definitions.  This can be useful for redefining `jqmd_data` or other functions at various points within your filter pipeline, or to define functions that will only be used for one `RUN_JQ` pipeline.
 
@@ -187,7 +187,7 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 Notice that JSON and YAML blocks are always filtered through a `jqmd_data()` function, which by default does [data merging](#data-merging), but you can always redefine the function to do something different, even as part of a `FILTER` or jq block. (Just remember that while filters can begin with function definitions, they must each *end* with an expression, even if it's only a `.`.)
 
-Also note that data passed to the `JSON` and `YAML` functions *can contain jq interpolation expressions*, which means that you **must not pass untrusted data to them**.  You can validate and/or neutralize such data by piping it through the `yaml2json` function before calling `JSON` on it.
+Also note that data passed to the `JSON` and `YAML` functions *can contain jq interpolation expressions*, which means that you **must not pass untrusted data to them**.  You can validate and/or neutralize such data by piping it through `jq` (for JSON) or the `yaml2json` function (for YAML) before calling `JSON` on it.  (Untrusted JSON data can also be inserted as a jq variable using `ARGJSON`, as described below.)
 
 #### Adding jq Options and Arguments
 
