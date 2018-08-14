@@ -11,6 +11,8 @@
 - [Installation](#installation)
 - [Usage](#usage)
   * [Data Merging](#data-merging)
+  * [Reusable Blocks](#reusable-blocks)
+  * [Named Constants](#named-constants)
 - [Programming Models](#programming-models)
   * [Filters](#filters)
   * [Scripts](#scripts)
@@ -36,24 +38,13 @@ Running `jqmd some-document.md args...` will read and interpret unindented, trip
 
 * `shell` -- interpreted as bash code, executed immediately.  Shell blocks can invoke various jqmd functions as described later in this document.
 
-* `jq` -- jq code, which is added to a jq filter pipeline for execution at the end of the file, or to be run explicitly with the `RUN_JQ` function.
+* `jq` -- jq code, which is added to a jq filter pipeline for execution at the end of the file, or to be run explicitly with the `RUN_JQ` function.  Blocks written in jq can also be tagged with `@func` to turn them into shell functions instead of executing them immediately; see the section below on [reusable blocks](#reusable-blocks) for more details.
 
 * `jq defs` -- jq function definitions, which are accumulated over the course of the program run, and included at the start of any executed filter pipelines
 
 * `jq imports` -- jq module includes or imports, which are accumulated over the course of the program run, and included at the start of any executed filter pipelines (before the current set of `jq defs`).
 
-* `yaml`, `json` -- YAML data or JSON expressions, which are added to the jq filter pipeline as `jqmd_data(data)`.  (Which turns the given data into a jq filter to modify an existing data structure; see [Data Merging](#data-merging), below for more details).  Data blocks can also be tagged as "named constants": a code block starting with e.g. `` ```yaml !const foo `` will have its contents defined as a zero-argument jq function named `foo`.
-
-  That is, the following two code blocks do the exact same thing:
-
-  ~~~markdown
-  ```jq defs
-  def pi: jqmd_data(3.14159);
-  ```
-  ```json !const pi
-  3.14159
-  ```
-  ~~~
+* `yaml`, `json` -- YAML data or JSON expressions, which are added to the jq filter pipeline as `jqmd_data(data)`.  (Which turns the given data into a jq filter to modify an existing data structure; see [Data Merging](#data-merging), below for more details).  Data blocks can also be tagged with `@func` and `!const` to turn them into shell functions or JQ constants instead of executing them immediately; see the sections below on  [resusable blocks](#resusable-blocks) and [named constants](#named-constants) for more details.
 
   (Note: YAML data can only be processed if there is a `yaml2json` executable on `PATH`, the system `python` interpreter has PyYAML installed, or [yaml2json.php](https://packagist.org/packages/dirtsimple/yaml2json) is installed; otherwise an error will occur.  (For best performance, we recommend installing a tool like this [yaml2json written in Go](https://github.com/bronze1man/yaml2json), as its process startup time alone is considerably smaller than that of Python or PHP.)
 
@@ -96,6 +87,61 @@ If you want to override the data merging for *all* data as of the start of the f
 ```shell
 FILTER 'def jqmd_data($data): jqmd::data($data) ; .'
 ```
+
+#### Reusable Blocks
+
+Normally, code or data blocks are executed immediately, at the point they appear in the document.  But for more complex scripts or libraries, this is a bit limiting.  So jqmd allows you to turn blocks into shell functions, so they can be called more than once (or not at all), possibly with parameters.  For example, the following markdown:
+
+~~~markdown
+```jq @func setElement key="$1" @val="$2"
+.[$key] = $val
+```
+
+```yaml @func mksite SITE WP_HOME
+services:
+  \($SITE):
+    environment:
+      WP_HOME: \($WP_HOME)
+```
+~~~
+
+...expands into the following two shell functions:
+
+```shell
+function setElement() {
+	APPLY $'.[$key] = $val\n' \
+		key="$1" @val="$2"
+}
+
+function mksite() {
+	APPLY $'jqmd_data({"services":{"\\($SITE)":{"environment":{"WP_HOME":"\\($WP_HOME)"}}}})\n' \
+		SITE WP_HOME
+}
+```
+
+Everything after the `@func name` part of the block opener becomes arguments to `APPLY`, which maps shell variables or other values to jq variables with the specified names.  An `@` before an argument name means, "this variable or value is already JSON-encoded", and the absence of an `=` means "create a jq variable with the same name and value as this shell or environment variable".  (Note: values after `=` should be quoted as shown above if they contain variables or shell parameters like `$1`.)
+
+So, our example `setElement`  function takes two positional arguments and sets a key (given as a string) to a value (given as JSON data).  So e.g. `setElement foo 42` would be equivalent to the jq expression  `.foo = 42`.
+
+The second example function, `mksite`, sets the `WP_HOME` for a docker-compose service named `$SITE` with the *current* contents of `$SITE` and `$WP_HOME`.  (Unlike normal docker-compose string interpolation -- which can only use one value for an environment variable -- this function can be called several times with different `SITE` and `WP_HOME` values to build up configuration for mutliple containers.)
+
+These are just a few examples of what you can do with reusable `@func` blocks.  `@func` can only be used with `json`, `yaml`, or `jq` blocks.  `jq` and `json` blocks can refer directly to parameter variables, while `yaml` blocks can only use string interpolation (`\( $var )` ) to insert string keys or values.  `jq` blocks are applied as-is, while `json` and `yaml` blocks are wrapped in a call to `jqmd_data()` (as described in [Data Merging](#data-merging), above).
+
+#### Named Constants
+
+Data blocks can also be tagged as "named constants": a code block starting with e.g. `` ```yaml !const foo `` will have its contents defined as a zero-argument jq function named `foo`.
+
+  That is, the following two code blocks do the exact same thing:
+
+  ~~~markdown
+  ```jq defs
+  def pi: 3.14159;
+  ```
+  ```json !const pi
+  3.14159
+  ```
+  ~~~
+
 
 ### Programming Models
 

@@ -240,6 +240,17 @@ mdsh-compile-yml()  { y2j "$1"; mdsh-compile-json "$REPLY"; }
 mdsh-compile-yaml() { y2j "$1"; mdsh-compile-json "$REPLY"; }
 mdsh-compile-json() { mdsh-compile-jq "jqmd_data($1)"; }
 
+mdsh-compile-func() {
+	case ${tag_words-} in
+		yml|yaml) y2j "$1"; REPLY="jqmd_data($REPLY)"$'\n' ;;
+		json*) REPLY="jqmd_data($1)"$'\n' ;;
+		jq|javascript|js) REPLY=$1 ;;
+		*) mdsh-error "Invalid language for function: '%s'" "${tag_words-}"; return
+	esac
+	printf 'function %s() {\n\tAPPLY %q \\\n\t\t%s\n}\n' "${tag_words[2]}" "$REPLY" \
+		"${2#*${tag_words}*${tag_words[1]}*${tag_words[2]}}"
+}
+
 const() {
 	case "${tag_words-}" in
 	yaml|yml) y2j "$block"; printf 'DEFINE %q\n' "def $1: $REPLY ;"$'\n' ;;
