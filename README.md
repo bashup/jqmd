@@ -2,7 +2,7 @@
 
 `jqmd` is a tool for writing well-documented, complex manipulations of YAML or JSON data structures using bash scripting and `jq`.  It allows you to mix both kinds of code -- plus snippets of YAML or JSON data! -- within one or more markdown documents, making it easier to write scripts that do complex things like generate `docker-compose` configurations or manipulate serialized Wordpress options.
 
-`jqmd` is implemented as an extension of [`mdsh`](https://github.com/bashup/mdsh), which means you can extend it to process additional kinds of code blocks by defining functions inside your `mdsh` blocks.  But you do not need to install mdsh, and you can use `jqmd --compile` to make distributable scripts that don't require jqmd *or* mdsh.
+`jqmd` is implemented as an extension of [`mdsh`](https://github.com/bashup/mdsh), which means you can extend it to process additional kinds of code blocks by defining functions inside your `shell @mdsh` blocks.  But you do not need to install mdsh, and you can use `jqmd --compile` to make distributable scripts that don't require jqmd *or* mdsh.
 
 **Contents**
 
@@ -23,8 +23,6 @@
   * [Controlling jq Execution](#controlling-jq-execution)
   * [Command-line Arguments](#command-line-arguments)
 - [Supporting Additional Languages](#supporting-additional-languages)
-  * [Postprocessing Code or Data Blocks](#postprocessing-code-or-data-blocks)
-  * [Advanced Compilation Techniques](#advanced-compilation-techniques)
 
 <!-- tocstop -->
 
@@ -52,7 +50,7 @@ Running `jqmd some-document.md args...` will read and interpret unindented, trip
 
   (In addition, `json` blocks do not have to be valid JSON: they can actually contain arbitrary jq expressions.  The only real difference between a `json` block and a `jq` block is that a JSON block is automatically wrapped in a call to `jqmd_data()`.)
 
-(As with `mdsh`, you can extend the above list by defining appropriate hook functions in `mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
+(As with `mdsh`, you can extend the above list by defining appropriate hook functions in `shell @mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
 
 Once all blocks have been executed or added to the filter pipeline, jq is run on standard input with the built-up filter pipeline, if any.  (If the filtering pipeline is empty, jq is not run.)  Filter pipeline elements are automatically separated with `|`,  so you should not include a `|` at the beginning or end of your `jq` blocks or `APPLY` / `FILTER` code.
 
@@ -285,43 +283,8 @@ You can pass additional arguments to `jqmd`, after the path to the markdown file
 
 ### Supporting Additional Languages
 
-By default, `jqmd` only interprets markdown blocks tagged as `shell`, `jq`, `yaml`, `yml`, or `json`.  As with `mdsh`, however, you can define interpreters for other block types by defining `mdsh-lang-X` functions in`mdsh` blocks, via a wrapper script, or as exported functions in your bash environment.  (You can also override these functions to change jqmd's default interpretation of jq, YAML, or JSON blocks.)
+By default, `jqmd` only interprets unindented, triple-backquoted markdown blocks tagged as `shell`, `jq`, `jq defs`, `jq imports`, `yaml`, `yml`, or `json`.  Unindented triple-backquoted blocks with any other tags are interpreted as data and assigned to shell variables, as described in the [mdsh docs on data blocks](https://github.com/bashup/mdsh#data-blocks).
 
-When a code block of type `X` is encountered, the corresponding `mdsh-lang-X` function will be called with the contents of the block on the function's standard input.  (Note: the function name is **case sensitive**, so a block tagged `C` (uppercase) will not use a processor defined for `c` (lowercase) or vice-versa.)
+As with `mdsh`, however, you can define interpreters for other block types by defining `mdsh-lang-X` or `mdsh-compile-X` functions in `shell @mdsh` blocks, via a wrapper script, or as exported functions in your bash environment.  (You can also override these functions to change jqmd's default interpretation of jq, YAML, or JSON blocks.)
 
-If no corresponding language processor is defined when a block of type `X` is encountered, the contents of the block are appended to a bash array named `mdsh_raw_X`, where `X` is the language tag on the code block, with non-identifier characters changed to `_`.
-
-So, if you have code blocks with a language tag of  `foo`, then `$mdsh_raw_foo` or `${mdsh_raw_foo[0]}` will return the contents of the first such block, `${mdsh_raw_foo[1]}` is the second, and so on.  Normal bash array rules apply, and you are free to modify the array in any way you like: mdsh merely adds new elements to the array as blocks are encountered.
-
-#### Postprocessing Code or Data Blocks
-
-Functions named `mdsh-after-X` will be called *after* a code block of  type `X` is processed.  The function does *not* receive the block contents, and is called whether or not a corresponding  `mdsh-lang-X` function exists.
-
-If there is no `mdsh-lang-X`, the `mdsh-after-X` function can read the most recent block's contents from `${mdsh_raw_X[-1]}`.  (This can be useful when running language interpreters that can't execute code via stdin, or when you want the code to run with the main script's stdin.)  If you don't unset the array, it will keep growing as more blocks of that language are encountered.
-
-Another trick you can do with postprocessing hooks, is to automatically run jq after each `jq` block.  For example:
-
-> ~~~markdown
-> ​```mdsh
-> mdsh-after-jq() { RUN_JQ -- somefile.json ; }
-> ​```
->
-> ​```jq
-> .x.y
-> ​```
->
-> ​```jq
-> .z
-> ​```
-> ~~~
-
-The above script will run `jq` twice on `somefile.json` with two different filters, instead of once with the results of the first filter being passed through the second.  (Because each run of `RUN_JQ` resets the filter pipeline.)  As always, however,`IMPORTS`, `DEFINES`, `JQ_OPTS`, `ARG` defs, etc. are retained from one jq run to the next.
-
-(Note that `mdsh` post-processing hooks are **only** applied to blocks found in the current markdown file.  They do **not** run when `FILTER` ,  `YAML` , `JSON`, etc. are invoked programmatically!)
-
-#### Advanced Compilation Techniques
-
-`mdsh` actually allows for far more sophisticated code generation and metaprogramming than we've covered here: please consult its [docs](https://github.com/bashup/mdsh) for more details!
-
-
-
+For more information on how to do this, see the [mdsh docs on processing non-shell languages](https://github.com/bashup/mdsh#processing-non-shell-languages), or consult the mdsh docs in general for more info on what you can do with jqmd.
