@@ -37,13 +37,19 @@ And then reset with `CLEAR_FILTERS`:
     jq
 ````
 
-You can generate args with `ARGQUOTE`:
+You can generate args with `ARGSTR` and `ARGVAL`:
 
 ~~~shell
-    $ ARGQUOTE 'foo"bar'; echo $REPLY
+    $ ARGSTR 'foo"bar'; echo $REPLY
     $JQMD_QA_1
-    $ ARGQUOTE spammity; echo $REPLY
+    $ ARGSTR spammity; echo $REPLY
     $JQMD_QA_4
+    $ ARGVAL true; echo $REPLY
+    $JQMD_JA_7
+    $ printf ' %q' "${JQ_OPTS[@]}"; echo
+     jq --arg JQMD_QA_1 foo\"bar --arg JQMD_QA_4 spammity --argjson JQMD_JA_7 true
+    $ RUN_JQ -n '$JQMD_JA_7'
+    true
 ~~~
 
 JSON quoting can be done with `JSON-QUOTE`, or via extra args to `FILTER` or `JSON`:
@@ -52,12 +58,40 @@ JSON quoting can be done with `JSON-QUOTE`, or via extra args to `FILTER` or `JS
     $ JSON-QUOTE $'\n\r\t' $'\x01\x1f' "\\"; echo "${REPLY[@]}"
     "\n\r\t" "\u0001\u001f" "\\"
 
-    $ FILTER 'foo(%s; %s)' bar 'baz"spam'; echo $jqmd_filters
+    $ FILTER 'foo(%s; %s)' bar 'baz"spam'; echo "$jqmd_filters"
     foo("bar"; "baz\"spam")
 
     $ CLEAR_FILTERS
-    $ JSON '{%s: %s}' foo bar; echo $jqmd_filters
+    $ JSON '{%s: %s}' foo bar; echo "$jqmd_filters"
     jqmd_data({"foo": "bar"})
+~~~
+
+You can also `APPLY` a jq expression with jq variables bound to shell variables or values, either as strings or raw jq expressions:
+
+~~~shell
+    $ CLEAR_FILTERS
+    $ foo='bar"baz' bar='27'
+
+    $ APPLY . foo; echo "$jqmd_filters"; CLEAR_FILTERS
+    "bar\"baz" as $foo
+
+    $ APPLY 'bang($bar)'; echo "$jqmd_filters"; CLEAR_FILTERS
+    ( bang($bar) )
+
+    $ APPLY 'bang($bar)' @bar; echo "$jqmd_filters"; CLEAR_FILTERS
+    ( ("27"|fromjson) as $bar | bang($bar) )
+
+    $ APPLY . foo @bar baz=thingy @spam=54; echo "$jqmd_filters"; CLEAR_FILTERS
+    "bar\"baz" as $foo | ("27"|fromjson) as $bar | "thingy" as $baz | ("54"|fromjson) as $spam
+
+# Longer values get passed as arguments instead of quoted:
+
+    $ APPLY . foo="This is a relatively long string. It should be passed as an argument."
+    $ APPLY . @bar='"This is a rather long JSON value. It should be passed as an argument."'
+    $ echo "$jqmd_filters"
+    $JQMD_QA_1 as $foo
+    | $JQMD_JA_4 as $bar
+
 ~~~
 
 ### Invoking JQ
@@ -108,7 +142,7 @@ The `JQ_CMD` function adds the supplied args to `$JQOPTS` and combines them with
     $ echo '.filter' >foo.jq
     $ echo '.thing' >bar.jq
     $ JQ -f foo.jq -c --fromfile bar.jq
-     jq -c .filter\|.thing
+     jq -c $'.filter\n| .thing'
 
 # Unless the file doesn't exist or can't be read:
     $ JQ -f nosuch.file

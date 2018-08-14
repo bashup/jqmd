@@ -42,7 +42,7 @@ Running `jqmd some-document.md args...` will read and interpret unindented, trip
 
 * `jq imports` -- jq module includes or imports, which are accumulated over the course of the program run, and included at the start of any executed filter pipelines (before the current set of `jq defs`).
 
-* `yaml`, `json` -- YAML data or JSON expressions, which are added to the jq filter pipeline as `jqmd_data(data)`.  (Which turns the given data into a jq filter to modify an existing data structure; see [Data Merging](#data-merging), below for more details).  Data blocks can also be tagged as "named constants": a code block starting with e.g. `````yaml !const foo`` will have its contents defined as a zero-argument jq function named `foo`.
+* `yaml`, `json` -- YAML data or JSON expressions, which are added to the jq filter pipeline as `jqmd_data(data)`.  (Which turns the given data into a jq filter to modify an existing data structure; see [Data Merging](#data-merging), below for more details).  Data blocks can also be tagged as "named constants": a code block starting with e.g. `` ```yaml !const foo `` will have its contents defined as a zero-argument jq function named `foo`.
 
   That is, the following two code blocks do the exact same thing:
 
@@ -63,7 +63,7 @@ Running `jqmd some-document.md args...` will read and interpret unindented, trip
 
 (As with `mdsh`, you can extend the above list by defining appropriate hook functions in `mdsh` blocks; see the section below on "Supporting Additional Languages" for more info.)
 
-Once all blocks have been executed or added to the filter pipeline, jq is run on standard input with the built-up filter pipeline, if any.  (If the filtering pipeline is empty, jq is not run.)  Filter pipeline elements are automatically separated with `|`,  so you should not include a `|` at the beginning or end of your `jq` blocks or `FILTER` code.
+Once all blocks have been executed or added to the filter pipeline, jq is run on standard input with the built-up filter pipeline, if any.  (If the filtering pipeline is empty, jq is not run.)  Filter pipeline elements are automatically separated with `|`,  so you should not include a `|` at the beginning or end of your `jq` blocks or `APPLY` / `FILTER` code.
 
 As with `mdsh`, you can optionally make a markdown file directly executable by giving it a shebang line such as `#!/usr/bin/env jqmd`, or use a [shelldown header](https://github.com/bashup/mdsh#making-sourceable-scripts-and-handling-0) to make it executable, sourceable, and pretty.  :)  A sample shelldown header for jqmd might look like:
 
@@ -91,7 +91,7 @@ In a jqmd program, one is often incrementally defining some sort of data structu
 
 For most programs, this algorithm is sufficient to do most incremental data structure creation.  If you have different needs, however, you can define a `jqmd_data` function of your own: JSON and YAML data are wrapped with a call to `jqmd_data`, but the default `jqmd_data` just calls `jqmd::data`.
 
-If you want to override the data merging for *all* data as of the start of the filter chain, you define a `jqmd_data` function in a `DEFINE` call or a `jq defs` block.  Or, you can override it for just a few filters or blocks by defining it in a `FILTER` call or `jq` block.  Afterwards, you can restore the original data merging algorithm like this:
+If you want to override the data merging for *all* data as of the start of the filter chain, you define a `jqmd_data` function in a `DEFINE` call or a `jq defs` block.  Or, you can override it for just a few filters or blocks by defining it in an `APPLY` or `FILTER` call or `jq` block.  Afterwards, you can restore the original data merging algorithm like this:
 
 ```shell
 FILTER 'def jqmd_data($data): jqmd::data($data) ; .'
@@ -137,6 +137,16 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 ```
 
 #### Adding jq Code and Data
+
+* `APPLY` *expr [`@`]name[`=`value]...* -- add *expr* to the jq filter pipeline, with the named jq variables bound to the specified values or the value of the corresponding shell variable.  If *expr* is the empty string or `.`, the variables can be used by the entire filter chain past this point; otherwise they are only visible within *expr*.
+
+  Each *name* must be a valid jq variable name (minus the leading `$`).  If the `=`*value*  is omitted, the value of the shell variable *name* is used.  By default, the value is received by jq as a string, but if *name* is prefixed with `@`, then the value is interpreted as JSON.  So, if you need to pass in a number, boolean, or other value already in JSON format (even a complex data structure) you can use `@` to pass it in -- even if it's untrusted user-supplied data.  e.g.:
+
+  ```shell
+  APPLY 'some_func($foo; $bar)' @foo=42 @bar="$untrusted_json"
+  ```
+
+  This code will call `some_func(42; $bar)` with jq's `$bar` variable set to the arbitrary JSON value from `$untrusted_json`, or else abort with an error during the jq run if `$untrusted_json` contains invalid JSON.
 
 * `IMPORTS` *arg* -- add the given jq `import` or `include` statements to a block that will appear at the very beginning of the jq "program".  (Each statement must be terminated with `;`, as is standard for jq.)  Imports are accumulated in the order they are processed, but *all* imports active as of a given jq run will be placed at the beginning of the overall program, as required by jq syntax.
 
@@ -187,14 +197,16 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 Notice that JSON and YAML blocks are always filtered through a `jqmd_data()` function, which by default does [data merging](#data-merging), but you can always redefine the function to do something different, even as part of a `FILTER` or jq block. (Just remember that while filters can begin with function definitions, they must each *end* with an expression, even if it's only a `.`.)
 
-Also note that data passed to the `JSON` and `YAML` functions *can contain jq interpolation expressions*, which means that you **must not pass untrusted data to them**.  You can validate and/or neutralize such data by piping it through `jq` (for JSON) or the `yaml2json` function (for YAML) before calling `JSON` on it.  (Untrusted JSON data can also be inserted as a jq variable using `ARGJSON`, as described below.)
+Also note that data passed to the `JSON` and `YAML` functions *can contain jq interpolation expressions*, which means that you **must not pass untrusted data to them**.  If you need to process a user-supplied JSON string, the simplest way is to use `JSON "( %s | fromjson)" "$untrusted_json"`.  Alternately, you can call `ARGJSON someJQvarname "$untrusted_json"` to create the jq variable `$someJQvarname`, and then use it with e.g. `JSON '$someJQvarname'` . (Note the single quotes!)
+
+(If your user-supplied data is in YAML form, you can use the same approaches, but must convert it to JSON first.)
 
 #### Adding jq Options and Arguments
 
 * `JQ_OPTS` *opts...* -- add *opts* to the jq command line being built up.  Whenever jq is run (either explicitly using `RUN_JQ` or `CALL_JQ`, or implicitly at the end of the document), the given options will be part of the command line.
 * `ARG` *name value* -- define a jq variable named `$`*name*, with the supplied string value.  (Shortcut for  `JQ_OPTS --arg name value`.)
-* `ARGQUOTE` *value* -- like `ARG`, but instead of passing in an argument name, a unique argument name is generated, and returned in `$REPLY`.  The returned string will expand as *value* in any jq expressions.
 * `ARGJSON` *name json-value* -- define a jq variable named `$`*name*, with the supplied JSON value.  (Shortcut for `JQ_OPTS --argjson name json`.)  This is especially useful for passing the output of other programs or data files as arguments to your jq code, e.g. `ARGJSON something "$(wp option get something --format=json)"`.
+* `ARGSTR` *string* and `ARGVAL` *json-value* -- these functions work like `ARG` and `ARGJSON`, but instead of you passing in an argument name, a unique argument name is automatically generated, and returned in `$REPLY`.  The returned string will expand to the passed in-value in any jq expressions.
 
 
 (Note: the added options will reset to empty again after `RUN_JQ`, `CALL_JQ`, or `CLEAR_FILTERS`.)

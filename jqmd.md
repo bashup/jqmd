@@ -56,14 +56,31 @@ IMPORTS() { jqmd_imports+="${jqmd_imports:+$'\n'}$1"; }
 DEFINE()  { jqmd_defines+="${jqmd_defines:+$'\n'}$1"; }
 FILTER()  {
 	case $# in
-	1) jqmd_filters+="${jqmd_filters:+|}$1"; return ;;
+	1) jqmd_filters+="${jqmd_filters:+$'\n'| }$1"; return ;;
 	0) return ;;
 	esac
 	local REPLY ARGS=(printf -v REPLY "$1"); shift
 	JSON-QUOTE "$@"; ARGS+=("${REPLY[@]}"); "${ARGS[@]}"; FILTER "$REPLY"
 }
 
+APPLY() {
+	local name filter='' REPLY expr=${1-} lf=$'\n'; shift
+	while (($#)); do
+		name=${1#@}; REPLY=${name#*=}
+		[[ $name == *=* ]] || REPLY=${!name}
+		if ((${#REPLY} > 32)); then
+			if [[ $1 == @* ]]; then ARGVAL "$REPLY"; else ARGSTR "$REPLY"; fi
+		else
+			JSON-QUOTE "$REPLY"; [[ $1 != @* ]] || REPLY="($REPLY|fromjson)"
+		fi
+		filter+=" | $REPLY as \$${name%%=*}"; shift
+	done
+	filter=${filter:3}; [[ ! $expr || $expr == . ]] || filter="( ${filter:+$filter | }$expr )"
+	${filter:+FILTER "$filter"}
+}
+
 JSON-QUOTE() {
+	local LC_ALL=C
 	set -- "${@//\\/\\\\}";   set -- "${@//\"/\\\"}"   # \ and "
 	set -- "${@//$'\n'/\\n}"; set -- "${@//$'\r'/\\r}"; set -- "${@//$'\t'/\\t}"  # \n\r\t
 	set -- "${@/#/\"}";       set -- "${@/%/\"}"  # leading and trailing '"'
@@ -87,7 +104,9 @@ JQ_OPTS=(jq)
 JQ_OPTS() { JQ_OPTS+=("$@"); }
 ARG()     { JQ_OPTS --arg     "$1" "$2"; }
 ARGJSON() { JQ_OPTS --argjson "$1" "$2"; }
-ARGQUOTE() { REPLY=JQMD_QA_${#JQ_OPTS[@]}; ARG "$REPLY" "$1"; REPLY='$'$REPLY; }
+ARGQUOTE() { ARGSTR "$1"; }  # deprecated
+ARGSTR() { REPLY=JQMD_QA_${#JQ_OPTS[@]}; ARG     "$REPLY" "$1"; REPLY='$'$REPLY; }
+ARGVAL() { REPLY=JQMD_JA_${#JQ_OPTS[@]}; ARGJSON "$REPLY" "$1"; REPLY='$'$REPLY; }
 ```
 
 ### Invoking jq
@@ -103,7 +122,7 @@ JQ_CMD() {
 			FILTER "$opt"; shift 2; continue
 			;;
 		-L|--indent)                            nargs=2 ;;
-		--arg|--arjgson|--slurpfile|--argfile)  nargs=3 ;;
+		--arg|--argjson|--slurpfile|--argfile)  nargs=3 ;;
 		--)  break   ;; # rest of args are data files
 		-*)  nargs=1 ;;
 		*)   FILTER "$1"; break ;;	# jq program: data files follow
