@@ -13,9 +13,13 @@ jqmd is an mdsh extension written as a literate program using mdsh.  Within this
 - [File Header](#file-header)
 - [Runtime](#runtime)
   * [jq imports, filters, and defines](#jq-imports-filters-and-defines)
+  * [JSON Data Structures](#json-data-structures)
   * [jq options and arguments](#jq-options-and-arguments)
   * [Invoking jq](#invoking-jq)
   * [YAML and JSON data](#yaml-and-json-data)
+    + [jqmd::data](#jqmddata)
+    + [YAML Interpolation](#yaml-interpolation)
+    + [YAML to JSON Conversion (yaml2json)](#yaml-to-json-conversion-yaml2json)
 - [Main Program](#main-program)
 
 <!-- tocstop -->
@@ -78,22 +82,56 @@ APPLY() {
 	filter=${filter:3}; [[ ! $expr || $expr == . ]] || filter="( ${filter:+$filter | }$expr )"
 	${filter:+FILTER "$filter"}
 }
+```
 
+### JSON Data Structures
+
+```bash runtime
 JSON-QUOTE() {
 	local LC_ALL=C
-	if [[ $* != *[$'\x01'-$'\x1F'\\\"]* ]]; then
-		set -- "${@/#/\"}"; REPLY=("${@/%/\"}"); return
-	fi
-	set -- "${@//\\/\\\\}";   set -- "${@//\"/\\\"}"   # \ and "
+	[[ $* != *\\* ]] || set -- "${@//\\/\\\\}"
+	[[ $* != *\"* ]] || set -- "${@//\"/\\\"}"
+	set -- "${@/#/\"}"; set -- "${@/%/\"}"
+	if [[ $* != *[$'\x01'-$'\x1F']* ]]; then REPLY=("$@"); else escape-ctrlchars "$@"; fi
+}
+
+JSON-LIST() {
+	(($#)) || { REPLY=("[]"); return; }
+	JSON-QUOTE "$@"; REPLY=${REPLY[*]/%/,}; REPLY=("[${REPLY%,}]")
+}
+
+JSON-MAP() {
+	local -n v=$1; local LC_ALL=C n=${v[@]+${#v[@]}}; ((${n:-0})) || { REPLY=("{}"); return; }
+	local i=1 p='\"${@:i:1}\": \"${@: '"$n"'+ i++:1}\",'; p="${v[*]/#*/$p}"
+	set -- "${!v[@]}" "${v[@]}"
+	[[ $* != *\\* ]] || set -- "${@//\\/\\\\}"
+	[[ $* != *\"* ]] || set -- "${@//\"/\\\"}"
+	eval "REPLY=(\"{${p%,}}\")"
+	[[ $REPLY != *[$'\x01'-$'\x1F']* ]] || escape-ctrlchars "$REPLY"
+}
+
+JSON-KV() {
+	(($#)) || { REPLY=("{}"); return; }
+	local LC_ALL=C i=0 p='\"${REPLY[i]}\": \"${REPLY['"$#"'+i++]}\",'; p="${*/#*/$p}"
+	[[ $* != *\\* ]] || set -- "${@//\\/\\\\}"
+	[[ $* != *\"* ]] || set -- "${@//\"/\\\"}"
+	REPLY=("${@%%=*}" "${@#*=}"); eval "REPLY=(\"{${p%,}}\")"
+	[[ $REPLY != *[$'\x01'-$'\x1F']* ]] || escape-ctrlchars "$REPLY"
+}
+
+escape-ctrlchars() {
+	local LC_ALL=C
 	set -- "${@//$'\n'/\\n}"; set -- "${@//$'\r'/\\r}"; set -- "${@//$'\t'/\\t}"  # \n\r\t
-	set -- "${@/#/\"}";       set -- "${@/%/\"}"  # leading and trailing '"'
-	local r s=$*; s=${s//[^$'\x01'-$'\x1F']}
-	while [[ $s ]]; do
-		printf -v r \\\\u%04x "'${s:0:1}"; set -- "${@//"${s:0:1}"/$r}"
-		s=${s//${s:0:1}/}
-	done
+	if [[ $* == *[$'\x01'-$'\x1F']* ]]; then
+		local r s=$*; s=${s//[^$'\x01'-$'\x1F']}
+		while [[ $s ]]; do
+			printf -v r \\\\u%04x "'${s:0:1}"; set -- "${@//${s:0:1}/$r}"
+			s=${s//${s:0:1}/}
+		done
+	fi
 	REPLY=("$@")
 }
+
 ```
 
 ### jq options and arguments

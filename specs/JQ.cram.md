@@ -52,11 +52,23 @@ You can generate args with `ARGSTR` and `ARGVAL`:
     true
 ~~~
 
-JSON quoting can be done with `JSON-QUOTE`, or via extra args to `FILTER` or `JSON`:
+JSON quoting can be done with `JSON-QUOTE`, `JSON-LIST`, and `JSON-KV`, or via extra args to `FILTER` or `JSON`:
 
 ~~~shell
     $ JSON-QUOTE $'\n\r\t' $'\x01\x1f' "\\"; echo "${REPLY[@]}"
     "\n\r\t" "\u0001\u001f" "\\"
+
+    $ JSON-LIST; echo "${REPLY[@]}"
+    []
+
+    $ JSON-LIST foo bar baz; echo "${REPLY[@]}"
+    ["foo", "bar", "baz"]
+
+    $ JSON-KV; echo "${REPLY[@]}"
+    {}
+
+    $ JSON-KV foo=blue bar=baz spam; echo "${REPLY[@]}"
+    {"foo": "blue", "bar": "baz", "spam": "spam"}
 
     $ FILTER 'foo(%s; %s)' bar 'baz"spam'; echo "$jqmd_filters"
     foo("bar"; "baz\"spam")
@@ -64,6 +76,21 @@ JSON quoting can be done with `JSON-QUOTE`, or via extra args to `FILTER` or `JS
     $ CLEAR_FILTERS
     $ JSON '{%s: %s}' foo bar; echo "$jqmd_filters"
     jqmd_data({"foo": "bar"})
+~~~
+
+If you're on bash 4, you can also `JSON-MAP` an associative array to a JSON object:
+
+~~~shell
+    $ if (( BASH_VERSINFO > 3 )); then
+    >     declare -A empty_map mymap=([foo]=42 [bar]=baz [bing]=boom)
+    >     JSON-MAP mymap;    echo "${REPLY[@]}"
+    >     JSON-MAP emptymap; echo "${REPLY[@]}"
+    > else # fake it for bash 3
+    >     echo '{"bing": "boom", "bar": "baz", "foo": "42"}'
+    >     echo '{}'
+    > fi
+    {"bing": "boom", "bar": "baz", "foo": "42"}
+    {}
 ~~~
 
 You can also `APPLY` a jq expression with jq variables bound to shell variables or values, either as strings or raw jq expressions:

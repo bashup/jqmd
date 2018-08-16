@@ -19,6 +19,7 @@
   * [Extensions](#extensions)
 - [Available Functions](#available-functions)
   * [Adding jq Code and Data](#adding-jq-code-and-data)
+  * [JSON Escaping and Data Structures](#json-escaping-and-data-structures)
   * [Adding jq Options and Arguments](#adding-jq-options-and-arguments)
   * [Controlling jq Execution](#controlling-jq-execution)
   * [Command-line Arguments](#command-line-arguments)
@@ -237,13 +238,22 @@ DEFINE 'def jqmd_data($arg): recursive_add($arg);'
 
 * `yaml2json` -- a filter that takes YAML or JSON input, and produces JSON output.  The actual implementation is system-dependent, using either a `yam2json` command line tool, Python, or PHP, depending on what's available.  This can be used to convert data, validate it, or to remove jq expressions from untrusted input.
 
-* `JSON-QUOTE` *strings...* -- set `REPLY` to an array containing the JSON-quoted version of *strings*.  Each element in the resulting array will begin and end with double quotes, and have proper backslash escapes for contained control characters, double quotes, and backslashes.
 
 Notice that JSON and YAML blocks are always filtered through a `jqmd_data()` function, which by default does [data merging](#data-merging), but you can always redefine the function to do something different, even as part of a `FILTER` or jq block. (Just remember that while filters can begin with function definitions, they must each *end* with an expression, even if it's only a `.`.)
 
 Also note that data passed to the `JSON` and `YAML` functions *can contain jq interpolation expressions*, which means that you **must not pass untrusted data to them**.  If you need to process a user-supplied JSON string, the simplest way is to use `JSON "( %s | fromjson)" "$untrusted_json"`.  Alternately, you can call `ARGJSON someJQvarname "$untrusted_json"` to create the jq variable `$someJQvarname`, and then use it with e.g. `JSON '$someJQvarname'` . (Note the single quotes!)
 
 (If your user-supplied data is in YAML form, you can use the same approaches, but must convert it to JSON first.)
+
+#### JSON Escaping and Data Structures
+
+These functions don't do anything to jq or the filter pipeline; they simply escape, quote, or otherwise format values into JSON, returning the result(s) via `REPLY`.  You can then use them to build up `FILTER` strings, or pipe them to jq as input.
+
+* `JSON-QUOTE` *strings...* -- set `REPLY` to an array containing the JSON-quoted version of *strings*.  Each element in the resulting array will begin and end with double quotes, and have proper backslash escapes for contained control characters, double quotes, and backslashes.
+* `JSON-LIST` *strings...* -- set `REPLY` to a string representing a JSON list of the given *strings*.
+* `JSON-KV` *"key=val"...* -- set `REPLY` to a string representing a JSON object mapping from each given key to a string value.  Keys cannot contain `=`.  If an argument doesn't contain an `=`, its value is equal to its key.
+* `JSON-MAP` *assoc-array* -- (bash 4+ only) set `REPLY` to a string representing a JSON object containing the contents of the named *assoc-array*
+* `escape-ctrl-characters` *strings...* -- set `REPLY` to an array containing *strings* with control characters escaped as `\n`, `\t`, `\r`, or `\uXXXX`.  This function is used internally by the other `JSON-x` functions when their argument(s) contain control characters.
 
 #### Adding jq Options and Arguments
 
