@@ -81,19 +81,18 @@ APPLY() {
 
 JSON-QUOTE() {
 	local LC_ALL=C
+	if [[ $* != *[$'\x01'-$'\x1F'\\\"]* ]]; then
+		set -- "${@/#/\"}"; REPLY=("${@/%/\"}"); return
+	fi
 	set -- "${@//\\/\\\\}";   set -- "${@//\"/\\\"}"   # \ and "
 	set -- "${@//$'\n'/\\n}"; set -- "${@//$'\r'/\\r}"; set -- "${@//$'\t'/\\t}"  # \n\r\t
 	set -- "${@/#/\"}";       set -- "${@/%/\"}"  # leading and trailing '"'
-	REPLY=(); local s r
-	while (($#)); do
-		s=${1//[^$'\x01'-$'\x1F']/};
-		while [[ $s ]]; do
-			printf -v r \\\\u%04x "'${s:0:1}"
-			set -- "${@//"${s:0:1}"/"$r"}"
-			s=${s//"${s:0:1}"/}
-		done
-		REPLY+=("$1"); shift
+	local r s=$*; s=${s//[^$'\x01'-$'\x1F']}
+	while [[ $s ]]; do
+		printf -v r \\\\u%04x "'${s:0:1}"; set -- "${@//"${s:0:1}"/$r}"
+		s=${s//${s:0:1}/}
 	done
+	REPLY=("$@")
 }
 ```
 
