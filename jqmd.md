@@ -137,6 +137,7 @@ escape-ctrlchars() {
 ### jq options and arguments
 
 ```bash runtime
+JQ_CMD=(jq)
 JQ_OPTS=(jq)
 JQ_OPTS() { JQ_OPTS+=("$@"); }
 ARG()     { JQ_OPTS --arg     "$1" "$2"; }
@@ -150,7 +151,7 @@ ARGVAL() { REPLY=JQMD_JA_${#JQ_OPTS[@]}; ARGJSON "$REPLY" "$1"; REPLY='$'$REPLY;
 
 ```bash runtime
 JQ_CMD() {
-	local f= opt nargs cmd=(jq); set -- "${JQ_OPTS[@]:1}" "$@"
+	local f= opt nargs cmd=("${JQ_CMD[@]}"); set -- "${JQ_OPTS[@]:1}" "$@"
 
 	while (($#)); do
 		case "$1" in

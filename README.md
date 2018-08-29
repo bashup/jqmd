@@ -267,9 +267,9 @@ These functions don't do anything to jq or the filter pipeline; they simply esca
 
 #### Controlling jq Execution
 
-* `RUN_JQ` *args...* -- invoke `jq` with the current `JQ_OPTS` and given *args*.  If a "program" is given in `JQ_OPTS` (i.e., a non-option argument other than `--`), it's added to the filter pipeline, after any `IMPORTS` and `DEFINE` blocks established so far.  Any `-f` or `--fromfile` options are similarly added to the filter pipeline, and multiple such files are allowed.  (Unlike plain jq, which doesn't work properly with multiple `-f` options.)
+* `RUN_JQ` *args...* -- invoke `$JQ_CMD` (`jq` by default) with the current `JQ_OPTS` and given *args*.  If a "program" is given in `JQ_OPTS` (i.e., a non-option argument other than `--`), it's added to the filter pipeline, after any `IMPORTS` and `DEFINE` blocks established so far.  Any `-f` or `--fromfile` options are similarly added to the filter pipeline, and multiple such files are allowed.  (Unlike plain jq, which doesn't work properly with multiple `-f` options.)
 
-  After jq is run, the filter pipeline is emptied with `CLEAR_FILTERS`
+  After jq is run, the filter pipeline is emptied with `CLEAR_FILTERS`.
 
 * `CALL_JQ` *args...* -- exactly like `RUN_JQ`, except that the output of `jq` is captured into `$REPLY`.  You should use this instead of shell substitution to capture jq's output.
 
