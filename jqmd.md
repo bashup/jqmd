@@ -90,7 +90,7 @@ APPLY() {
 JSON-QUOTE() {
 	local LC_ALL=C
 	[[ $* != *\\* ]] || set -- "${@//\\/\\\\}"
-	[[ $* != *\"* ]] || set -- "${@//\"/\\\"}"
+	[[ $* != *'"'* ]] || set -- "${@//\"/\\\"}"
 	set -- "${@/#/\"}"; set -- "${@/%/\"}"
 	if [[ $* != *[$'\x01'-$'\x1F']* ]]; then REPLY=("$@"); else escape-ctrlchars "$@"; fi
 }
@@ -290,10 +290,10 @@ mdsh-compile-func() {
 }
 
 const() {
-	case "${tag_words-}" in
-	yaml|yml) y2j "$block"; printf 'DEFINE %q\n' "def $1: $REPLY ;"$'\n' ;;
-	json)     printf 'DEFINE %q\n' "def $1: $block ;"$'\n' ;;
-	*) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
+	case "${mdsh_lang-}" in
+	yaml|yml) y2j "$mdsh_block"; printf 'DEFINE %q\n' "def $1: $REPLY ;"$'\n' ;;
+	json)     printf 'DEFINE %q\n' "def $1: $mdsh_block ;"$'\n' ;;
+	*) mdsh-error "Invalid language for constant: '%s'" "${mdsh_lang-}"
 	esac
 }
 ```

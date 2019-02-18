@@ -21,16 +21,16 @@
 
 set -euo pipefail  # Strict mode
 mdsh-parse() {
-	local cmd=$1 lno=0 block_start lang block ln indent fence close_fence indent_remove
+	local cmd=$1 lno=0 block_start lang mdsh_block ln indent fence close_fence indent_remove
 	local open_fence=$'^( {0,3})(~~~+|```+) *([^`]*)$'
 	while ((lno++)); IFS= read -r ln; do
 		if [[ $ln =~ $open_fence ]]; then
-			indent=${BASH_REMATCH[1]} fence=${BASH_REMATCH[2]} lang=${BASH_REMATCH[3]} block=
+			indent=${BASH_REMATCH[1]} fence=${BASH_REMATCH[2]} lang=${BASH_REMATCH[3]} mdsh_block=
 			block_start=$lno close_fence="^( {0,3})$fence+ *\$" indent_remove="^${indent// / ?}"
 			while ((lno++)); IFS= read -r ln && ! [[ $ln =~ $close_fence ]]; do
-				! [[ $ln =~ $indent_remove ]] || ln=${ln#${BASH_REMATCH[0]}}; block+=$ln$'\n'
+				! [[ $ln =~ $indent_remove ]] || ln=${ln#${BASH_REMATCH[0]}}; mdsh_block+=$ln$'\n'
 			done
-			lang="${lang%"${lang##*[![:space:]]}"}"; "$cmd" fenced "$lang" "$block";
+			lang="${lang%"${lang##*[![:space:]]}"}"; "$cmd" fenced "$lang" "$mdsh_block"
 		fi
 	done
 }
@@ -48,7 +48,8 @@ mdsh-compile() (  # <-- force subshell to prevent escape of compile-time state
 )
 __COMPILE__() {
 	[[ $1 == fenced && $fence == $'```' && ! $indent ]] || return 0  # only unindented ``` code
-	local mdsh_lang tag_words; mdsh-splitwords "$2" tag_words;  # check for command blocks first
+	local mdsh_tag=$2 mdsh_lang tag_words
+	mdsh-splitwords "$2" tag_words  # check for command blocks first
 	case ${tag_words[1]-} in
 	'') mdsh_lang=${tag_words[0]-} ;;  # fast exit for common case
 	'@'*)
@@ -67,12 +68,20 @@ __COMPILE__() {
 		;;
 	*)  mdsh_lang=${2//[^_[:alnum:]]/_}  # convert entire line to safe variable name
 	esac
+	mdsh-emit-block
+}
+mdsh-block() {
+	local mdsh_lang=${1-${mdsh_lang-}} mdsh_block=${2-${mdsh_block-}}
+	local block_start=${3-${block_start-}} mdsh_tag=${4-${mdsh_lang-}} tag_words
+	mdsh-splitwords "$mdsh_tag" tag_words; mdsh-emit-block
+}
+mdsh-emit-block() {
 	if fn-exists "mdsh-lang-$mdsh_lang"; then
-		mdsh-rewrite "mdsh-lang-$mdsh_lang" "{" "} <<'\`\`\`'"; printf $'%s```\n' "$3"
+		mdsh-rewrite "mdsh-lang-$mdsh_lang" "{" "} <<'\`\`\`'"; printf $'%s```\n' "$mdsh_block"
 	elif fn-exists "mdsh-compile-$mdsh_lang"; then
-		"mdsh-compile-$mdsh_lang" "$3" "$2" "$block_start"
+		"mdsh-compile-$mdsh_lang" "$mdsh_block" "$mdsh_tag" "$block_start"
 	else
-		mdsh-misc "$2" "$3"
+		mdsh-misc "$mdsh_tag" "$mdsh_block"
 	fi
 	if fn-exists "mdsh-after-$mdsh_lang"; then
 		mdsh-rewrite "mdsh-after-$mdsh_lang"
@@ -247,7 +256,7 @@ run-markdown() {
 }
 mdsh_raw_bash_runtime+=($'#!/usr/bin/env bash\n\n# --- BEGIN jqmd runtime ---\n')
 mdsh_raw_bash_runtime+=($'jqmd_imports=\njqmd_filters=\njqmd_defines=\n\nHAVE_FILTERS() { [[ ${jqmd_filters-} ]]; }\nCLEAR_FILTERS() { unset jqmd_filters; JQ_OPTS=(jq); }\n\nIMPORTS() { jqmd_imports+="${jqmd_imports:+$\'\\n\'}$1"; }\nDEFINE()  { jqmd_defines+="${jqmd_defines:+$\'\\n\'}$1"; }\nFILTER()  {\n\tcase $# in\n\t1) jqmd_filters+="${jqmd_filters:+$\'\\n\'| }$1"; return ;;\n\t0) return ;;\n\tesac\n\tlocal REPLY ARGS=(printf -v REPLY "$1"); shift\n\tJSON-QUOTE "$@"; ARGS+=("${REPLY[@]}"); "${ARGS[@]}"; FILTER "$REPLY"\n}\n\nAPPLY() {\n\tlocal name filter=\'\' REPLY expr=${1-} lf=$\'\\n\'; shift\n\twhile (($#)); do\n\t\tname=${1#@}; REPLY=${name#*=}\n\t\t[[ $name == *=* ]] || REPLY=${!name}\n\t\tif ((${#REPLY} > 32)); then\n\t\t\tif [[ $1 == @* ]]; then ARGVAL "$REPLY"; else ARGSTR "$REPLY"; fi\n\t\telse\n\t\t\tJSON-QUOTE "$REPLY"; [[ $1 != @* ]] || REPLY="($REPLY|fromjson)"\n\t\tfi\n\t\tfilter+=" | $REPLY as \\$${name%%=*}"; shift\n\tdone\n\tfilter=${filter:3}; [[ ! $expr || $expr == . ]] || filter="( ${filter:+$filter | }$expr )"\n\t${filter:+FILTER "$filter"}\n}\n')
-mdsh_raw_bash_runtime+=($'JSON-QUOTE() {\n\tlocal LC_ALL=C\n\t[[ $* != *\\\\* ]] || set -- "${@//\\\\/\\\\\\\\}"\n\t[[ $* != *\\"* ]] || set -- "${@//\\"/\\\\\\"}"\n\tset -- "${@/#/\\"}"; set -- "${@/%/\\"}"\n\tif [[ $* != *[$\'\\x01\'-$\'\\x1F\']* ]]; then REPLY=("$@"); else escape-ctrlchars "$@"; fi\n}\n\nJSON-LIST() {\n\t(($#)) || { REPLY=("[]"); return; }\n\tJSON-QUOTE "$@"; REPLY=${REPLY[*]/%/,}; REPLY=("[${REPLY%,}]")\n}\n\nJSON-MAP() {\n\tlocal -n v=$1; local LC_ALL=C n=${v[@]+${#v[@]}}; ((${n:-0})) || { REPLY=("{}"); return; }\n\tlocal i=1 p=\'\\"${@:i:1}\\": \\"${@: \'"$n"\'+ i++:1}\\",\'; p="${v[*]/#*/$p}"\n\tset -- "${!v[@]}" "${v[@]}"\n\t[[ $* != *\\\\* ]] || set -- "${@//\\\\/\\\\\\\\}"\n\t[[ $* != *\\"* ]] || set -- "${@//\\"/\\\\\\"}"\n\teval "REPLY=(\\"{${p%,}}\\")"\n\t[[ $REPLY != *[$\'\\x01\'-$\'\\x1F\']* ]] || escape-ctrlchars "$REPLY"\n}\n\nJSON-KV() {\n\t(($#)) || { REPLY=("{}"); return; }\n\tlocal LC_ALL=C i=0 p=\'\\"${REPLY[i]}\\": \\"${REPLY[\'"$#"\'+i++]}\\",\'; p="${*/#*/$p}"\n\t[[ $* != *\\\\* ]] || set -- "${@//\\\\/\\\\\\\\}"\n\t[[ $* != *\\"* ]] || set -- "${@//\\"/\\\\\\"}"\n\tREPLY=("${@%%=*}" "${@#*=}"); eval "REPLY=(\\"{${p%,}}\\")"\n\t[[ $REPLY != *[$\'\\x01\'-$\'\\x1F\']* ]] || escape-ctrlchars "$REPLY"\n}\n\nescape-ctrlchars() {\n\tlocal LC_ALL=C\n\tset -- "${@//$\'\\n\'/\\\\n}"; set -- "${@//$\'\\r\'/\\\\r}"; set -- "${@//$\'\\t\'/\\\\t}"  # \\n\\r\\t\n\tif [[ $* == *[$\'\\x01\'-$\'\\x1F\']* ]]; then\n\t\tlocal r s=$*; s=${s//[^$\'\\x01\'-$\'\\x1F\']}\n\t\twhile [[ $s ]]; do\n\t\t\tprintf -v r \\\\\\\\u%04x "\'${s:0:1}"; set -- "${@//${s:0:1}/$r}"\n\t\t\ts=${s//${s:0:1}/}\n\t\tdone\n\tfi\n\tREPLY=("$@")\n}\n\n')
+mdsh_raw_bash_runtime+=($'JSON-QUOTE() {\n\tlocal LC_ALL=C\n\t[[ $* != *\\\\* ]] || set -- "${@//\\\\/\\\\\\\\}"\n\t[[ $* != *\'"\'* ]] || set -- "${@//\\"/\\\\\\"}"\n\tset -- "${@/#/\\"}"; set -- "${@/%/\\"}"\n\tif [[ $* != *[$\'\\x01\'-$\'\\x1F\']* ]]; then REPLY=("$@"); else escape-ctrlchars "$@"; fi\n}\n\nJSON-LIST() {\n\t(($#)) || { REPLY=("[]"); return; }\n\tJSON-QUOTE "$@"; REPLY=${REPLY[*]/%/,}; REPLY=("[${REPLY%,}]")\n}\n\nJSON-MAP() {\n\tlocal -n v=$1; local LC_ALL=C n=${v[@]+${#v[@]}}; ((${n:-0})) || { REPLY=("{}"); return; }\n\tlocal i=1 p=\'\\"${@:i:1}\\": \\"${@: \'"$n"\'+ i++:1}\\",\'; p="${v[*]/#*/$p}"\n\tset -- "${!v[@]}" "${v[@]}"\n\t[[ $* != *\\\\* ]] || set -- "${@//\\\\/\\\\\\\\}"\n\t[[ $* != *\\"* ]] || set -- "${@//\\"/\\\\\\"}"\n\teval "REPLY=(\\"{${p%,}}\\")"\n\t[[ $REPLY != *[$\'\\x01\'-$\'\\x1F\']* ]] || escape-ctrlchars "$REPLY"\n}\n\nJSON-KV() {\n\t(($#)) || { REPLY=("{}"); return; }\n\tlocal LC_ALL=C i=0 p=\'\\"${REPLY[i]}\\": \\"${REPLY[\'"$#"\'+i++]}\\",\'; p="${*/#*/$p}"\n\t[[ $* != *\\\\* ]] || set -- "${@//\\\\/\\\\\\\\}"\n\t[[ $* != *\\"* ]] || set -- "${@//\\"/\\\\\\"}"\n\tREPLY=("${@%%=*}" "${@#*=}"); eval "REPLY=(\\"{${p%,}}\\")"\n\t[[ $REPLY != *[$\'\\x01\'-$\'\\x1F\']* ]] || escape-ctrlchars "$REPLY"\n}\n\nescape-ctrlchars() {\n\tlocal LC_ALL=C\n\tset -- "${@//$\'\\n\'/\\\\n}"; set -- "${@//$\'\\r\'/\\\\r}"; set -- "${@//$\'\\t\'/\\\\t}"  # \\n\\r\\t\n\tif [[ $* == *[$\'\\x01\'-$\'\\x1F\']* ]]; then\n\t\tlocal r s=$*; s=${s//[^$\'\\x01\'-$\'\\x1F\']}\n\t\twhile [[ $s ]]; do\n\t\t\tprintf -v r \\\\\\\\u%04x "\'${s:0:1}"; set -- "${@//${s:0:1}/$r}"\n\t\t\ts=${s//${s:0:1}/}\n\t\tdone\n\tfi\n\tREPLY=("$@")\n}\n\n')
 mdsh_raw_bash_runtime+=($'JQ_CMD=(jq)\nJQ_OPTS=(jq)\nJQ_OPTS() { JQ_OPTS+=("$@"); }\nARG()     { JQ_OPTS --arg     "$1" "$2"; }\nARGJSON() { JQ_OPTS --argjson "$1" "$2"; }\nARGQUOTE() { ARGSTR "$1"; }  # deprecated\nARGSTR() { REPLY=JQMD_QA_${#JQ_OPTS[@]}; ARG     "$REPLY" "$1"; REPLY=\'$\'$REPLY; }\nARGVAL() { REPLY=JQMD_JA_${#JQ_OPTS[@]}; ARGJSON "$REPLY" "$1"; REPLY=\'$\'$REPLY; }\n')
 mdsh_raw_bash_runtime+=($'JQ_CMD() {\n\tlocal f= opt nargs cmd=("${JQ_CMD[@]}"); set -- "${JQ_OPTS[@]:1}" "$@"\n\n\twhile (($#)); do\n\t\tcase "$1" in\n\t\t-f|--fromfile)\n\t\t\topt=$(<"$2") || return 69\n\t\t\tFILTER "$opt"; shift 2; continue\n\t\t\t;;\n\t\t-L|--indent)                            nargs=2 ;;\n\t\t--arg|--argjson|--slurpfile|--argfile)  nargs=3 ;;\n\t\t--)  break   ;; # rest of args are data files\n\t\t-*)  nargs=1 ;;\n\t\t*)   FILTER "$1"; break ;;\t# jq program: data files follow\n\t\tesac\n\t\tcmd+=("${@:1:$nargs}")\t# add $nargs args to cmd\n\t\tshift $nargs\n\tdone\n\n\tHAVE_FILTERS || FILTER .    # jq needs at least one filter expression\n\tfor REPLY in "${jqmd_imports-}" "${jqmd_defines-}" "${jqmd_filters-}"; do\n\t\t[[ $REPLY ]] && f+=${f:+$\'\\n\'}$REPLY\n\tdone\n\n\tREPLY=("${cmd[@]}" "$f" "${@:2}")\n\tCLEAR_FILTERS   # cleanup for any re-runs\n}\n\nRUN_JQ() { JQ_CMD "$@" && "${REPLY[@]}"; }\nCALL_JQ() { JQ_CMD "$@" && REPLY=("$("${REPLY[@]}")"); }\n')
 mdsh_raw_bash_runtime+=($'YAML()  { y2j "$1"; JSON "$REPLY"; }\nJSON()  { FILTER "jqmd_data($1)" "${@:2}"; }\n')
@@ -275,10 +284,10 @@ mdsh-compile-func() {
 }
 
 const() {
-	case "${tag_words-}" in
-	yaml|yml) y2j "$block"; printf 'DEFINE %q\n' "def $1: $REPLY ;"$'\n' ;;
-	json)     printf 'DEFINE %q\n' "def $1: $block ;"$'\n' ;;
-	*) mdsh-error "Invalid language for constant: '%s'" "${tag_words-}"
+	case "${mdsh_lang-}" in
+	yaml|yml) y2j "$mdsh_block"; printf 'DEFINE %q\n' "def $1: $REPLY ;"$'\n' ;;
+	json)     printf 'DEFINE %q\n' "def $1: $mdsh_block ;"$'\n' ;;
+	*) mdsh-error "Invalid language for constant: '%s'" "${mdsh_lang-}"
 	esac
 }
 # Load the runtime so it's usable by mdsh
