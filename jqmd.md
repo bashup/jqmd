@@ -222,7 +222,7 @@ YAML blocks are allowed to have jq string interpolation expressions.  But since 
 
 ```bash runtime
 y2j() {
-	local p j="$(echo "$1" | yaml2json)" || return $?; REPLY=
+	local p j; j="$(echo "$1" | yaml2json)" || return $?; REPLY=
 	while [[ $j == *'\\('* ]]; do
 		p=${j%%'\\('*}; j=${j#"$p"'\\('}
 		if [[ $p =~ (^|[^\\])('\\\\')*$ ]]; then

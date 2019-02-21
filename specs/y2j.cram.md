@@ -24,3 +24,12 @@ Assuming that jq is run with null input and the result keys are sorted:
 ```shell
 RUN_JQ -n -S
 ```
+
+But any errors from `yaml2json` translation should be passed through:
+
+~~~sh
+    $ . "$TESTDIR/../jqmd.md" "$TESTDIR/$TESTFILE"; set +e
+    $ yaml2json() { return 42; }
+    $ y2j "{x: y}"
+    [42]
+~~~
