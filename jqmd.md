@@ -257,8 +257,7 @@ yaml2json() {
 			eval "yaml2json() { yaml2json:$kind; }"; yaml2json; return
 		fi
 	done
-	mdsh-error "To process YAML, must have one of: yaml2json, PyYAML, or yaml2json.php"
-	exit 69 # EX_UNAVAILABLE
+	exit 69 "To process YAML, must have one of: yaml2json, PyYAML, or yaml2json.php" # EX_UNAVAILABLE
 }
 
 # --- END jqmd runtime ---
@@ -316,7 +315,7 @@ It also defines a few command line options for controlling compilation:
 ```shell
 mdsh.--no-runtime() ( unset -f mdsh:file-header mdsh:file-footer; mdsh-main "$@"; )
 mdsh.--yaml() (
-	fn-exists "yaml2json:${1-}" || mdsh-error "No such yaml2json processor: ${1-}" || exit $?
+	fn-exists "yaml2json:${1-}" || exit $? "No such yaml2json processor: ${1-}"
 	eval 'yaml2json() { yaml2json:'"$1"'; }'
 	mdsh-main "${@:2}"
 )
