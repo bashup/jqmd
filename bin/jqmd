@@ -195,7 +195,7 @@ MDSH_MODULE=
 }
 @main() {
 	@is-main || return 0
-	MDSH_FOOTER=$'if [[ $0 == "${BASH_SOURCE-}" ]]; then '"$1"$' "$@"; fi\n'
+	MDSH_FOOTER=$'if [[ $0 == "${BASH_SOURCE-}" ]]; then '"$1"$' "$@"; exit; fi\n'
 }
 @comment() (  # subshell for cd
 	! [[ "${MDSH_SOURCE-}" == */* ]] || cd "${MDSH_SOURCE%/*}"
@@ -313,4 +313,4 @@ mdsh.--yaml() (
 
 mdsh.-R() { mdsh.--no-runtime "$@"; }
 mdsh.-y() { mdsh.--yaml "$@"; }
-if [[ $0 == "${BASH_SOURCE-}" ]]; then mdsh-main "$@"; fi
+if [[ $0 == "${BASH_SOURCE-}" ]]; then mdsh-main "$@"; exit; fi
