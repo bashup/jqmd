@@ -175,6 +175,14 @@ The `JQ_CMD` function adds the supplied args to `$JQOPTS` and combines them with
     $ JQ -f nosuch.file
     */jqmd.md: line *: nosuch.file: No such file or directory (glob)
     [69]
+
+# But if the total filter size is too long, it will use an inline file:
+    $ JQ_SIZE_LIMIT=10 JQ -f foo.jq -c  --fromfile bar.jq
+     JQ_WITH_FILE 2 jq -c $'.filter\n| .thing'
+    $ (function jq(){ echo jq "$@"; cat "$3"; }; JQ_WITH_FILE 2 jq -c $'.filter\n| .thing' x y z; )
+    jq -c -f /dev/fd/63 x y z
+    .filter
+    | .thing
 ````
 
 ### Capturing JQ Output

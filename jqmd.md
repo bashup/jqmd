@@ -139,6 +139,7 @@ escape-ctrlchars() {
 ```bash runtime
 JQ_CMD=(jq)
 JQ_OPTS=(jq)
+JQ_SIZE_LIMIT=16000
 JQ_OPTS() { JQ_OPTS+=("$@"); }
 ARG()     { JQ_OPTS --arg     "$1" "$2"; }
 ARGJSON() { JQ_OPTS --argjson "$1" "$2"; }
@@ -175,9 +176,11 @@ JQ_CMD() {
 	done
 
 	REPLY=("${cmd[@]}" "$f" "${@:2}")
+	if ((${#f} > JQ_SIZE_LIMIT)); then REPLY=(JQ_WITH_FILE "${#cmd[@]}" "${REPLY[@]}"); fi
 	CLEAR_FILTERS   # cleanup for any re-runs
 }
 
+JQ_WITH_FILE() { local n=$(($1++2)); "${@:2:$1}" -f <(echo "${!n}") "${@:n+1}"; }
 RUN_JQ() { JQ_CMD "$@" && "${REPLY[@]}"; }
 CALL_JQ() { JQ_CMD "$@" && REPLY=("$("${REPLY[@]}")"); }
 ```
